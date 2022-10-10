@@ -36,7 +36,7 @@ class programmer_gui(wx.Frame):
             self,
             parent,
             id,
-            'FMPUNO (Flash Memory Programmer UNO) - By Warber0x (github)'
+            'FMPMega (Flash Memory Programmer Mega) - By Warber0x (github)'
                 ,
             size=(900, 450),
             style=wx.DEFAULT_FRAME_STYLE ^ wx.RESIZE_BORDER
@@ -90,7 +90,7 @@ class programmer_gui(wx.Frame):
         # imageErase = wx.Image(imageFile3, wx.BITMAP_TYPE_ANY).ConvertToBitmap()
         # imageInfo = wx.Image(imageFile4, wx.BITMAP_TYPE_ANY).ConvertToBitmap()
 
-        font3 = wx.Font(12, wx.NORMAL, wx.ITALIC, wx.BOLD)
+        font3 = wx.Font(12, wx.DEFAULT, wx.NORMAL, wx.NORMAL)
         label6 = wx.StaticText(panel, -1, 'IC Operations:', (10, 200), size=(200, -1))
         label6.SetFont(font3)
 
@@ -101,7 +101,7 @@ class programmer_gui(wx.Frame):
 
         self.textarea = wx.TextCtrl(panel, pos=(240, 10), style=wx.TE_MULTILINE | wx.TE_READONLY, size=(450, 265))
 
-        font1 = wx.Font(12, wx.NORMAL, wx.ITALIC, wx.BOLD)
+        font1 = wx.Font(12, wx.DEFAULT, wx.NORMAL, wx.NORMAL)
         label1 = wx.StaticText(panel, -1, 'File to Upload', (10, 10), size=(200, -1))
         label1.SetFont(font1)
 
@@ -111,11 +111,11 @@ class programmer_gui(wx.Frame):
 
         self.ln = wx.StaticLine(panel, -1, pos=(20, 80), size=(200,-1), style=wx.LI_HORIZONTAL)
 
-        font1 = wx.Font(12, wx.NORMAL, wx.ITALIC, wx.BOLD)
-        label1 = wx.StaticText(panel, -1, 'Parameters:', (10, 90), size=(200, -1))
+        font1 = wx.Font(12, wx.DEFAULT, wx.NORMAL, wx.NORMAL)
+        label1 = wx.StaticText(panel, -1, 'Parameters:', (10, 90), size=(100, -1))
         label1.SetFont(font1)
 
-        label3 = wx.StaticText(panel, -1, 'Baude Rate: ', (10, 120), size=(200, -1))
+        label3 = wx.StaticText(panel, -1, 'Baud Rate: ', (10, 120), size=(80, -1))
         baude = [
             '115200',
             '57600',
@@ -128,8 +128,8 @@ class programmer_gui(wx.Frame):
             ]
         self.baudBox = wx.ComboBox(panel,-1,pos=(100, 120),size=(100, -1),choices=baude,style=wx.CB_READONLY,)
 
-        label5 = wx.StaticText(panel, -1, 'Serial port: ', (10, 150), size=(200, -1))
-        arduinoSerial = ['ttyACM0', 'ttyACM1', 'ttyACM2', 'ttyACM3', 'ttyACM4']
+        label5 = wx.StaticText(panel, -1, 'Serial port: ', (10, 150), size=(80, -1))
+        arduinoSerial = ['COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'COM10']
         self.serialBox = wx.ComboBox(panel,-1,pos=(100, 150),size=(100, -1),choices=arduinoSerial,style=wx.CB_READONLY,)
 
         self.ln = wx.StaticLine(panel, -1, pos=(20, 190), size=(200, 1), style=wx.LI_HORIZONTAL)
@@ -140,7 +140,7 @@ class programmer_gui(wx.Frame):
         # create a pubsub listener
         pub.subscribe(self.updateProgress, "update")
 
-        font6 = wx.Font(12, wx.NORMAL, wx.ITALIC, wx.BOLD)
+        font6 = wx.Font(12, wx.DEFAULT, wx.NORMAL, wx.NORMAL)
         label6 = wx.StaticText(panel, -1, 'IC Info', (710, 10), size=(200, -1))
         label6.SetFont(font6)
 
@@ -170,7 +170,7 @@ class programmer_gui(wx.Frame):
         self.intro = \
             '''ARDUINO AMD FLASH MEMORY PROGRAMMER - XXX29F0XX Series
             @Version: 1.0
-            @Arduino ver: UNO
+            @Arduino ver: MEGA
             @Python 3.9.1+
             @Author: https://github.com/warber0x
 
@@ -264,8 +264,9 @@ class programmer_gui(wx.Frame):
         t1 = GaugeThread()
 
         self.percent = 0
-        port = '/dev/' + str(self.serialBox.GetValue())
+        port = str(self.serialBox.GetValue())
         baudrate = str(self.baudBox.GetValue())
+        print(port,baudrate)
 
         # serial = 0
 
@@ -282,6 +283,8 @@ class programmer_gui(wx.Frame):
             i = 0
             linecount = 0
 
+            
+
             try:
                 arduino = serial.Serial(port, int(float(baudrate)),
                         timeout=1)
@@ -297,8 +300,7 @@ class programmer_gui(wx.Frame):
 
             self.SetStatusText('Please wait ...')
 
-            car = car + str("%02d" % linecount) + '\t\t'
-            car = car.upper()
+            car = car + str("%06x" % linecount) + '\t'
 
             command = 'R'
             arduino.write(command.encode())
@@ -316,7 +318,6 @@ class programmer_gui(wx.Frame):
             val = val.decode()                  # decoding from bytes
             val = val.strip()                   # stripping leading and trailing spaces.
             
-            
             for value in str(val):
                 car = car + value
                 count += 1
@@ -329,8 +330,8 @@ class programmer_gui(wx.Frame):
                 else:
                     car = car + '\n'
                     line = 1
-                    linecount += 1
-                    car = car + str("%02d" % linecount) + '\t\t'
+                    linecount += 16
+                    car = car + str("%06x" % linecount) + '\t'
                     car = car.upper()
                 
                 self.percent = round(i / total)
@@ -339,36 +340,6 @@ class programmer_gui(wx.Frame):
             car += '\n\n' + str(temp_intro)
             car = car.upper()
 
-            '''while 1:
-                # val = arduino.read()
-
-                if str(val) in '\\n': 
-                   break
-
-                car = car + val
-
-                count += 1
-
-                if count == 2:
-
-                    # self.textarea.SetValue(" "),
-
-                    car = car + ' '
-                    count = 0
-
-                if line != 32:
-                    line += 1
-                else:
-                    car = car + '\n'
-                    line = 1
-                    linecount += 1
-                    car = car + str(struct.pack('>I',linecount)) + '          '
-                    car = car.upper()
-
-                self.percent = round(i / total)
-                i += 1'''
-
-            
             self.textarea.SetValue(car)
             self.SetStatusText('Operation Completed Successfully.')
             dlg = wx.MessageDialog(self, 'Operation Completed', 'IC read', wx.OK)
@@ -389,15 +360,17 @@ class programmer_gui(wx.Frame):
 
     def OnErase(self, event):
         counter = 0
-        port = '/dev/' + str(self.serialBox.GetValue())
+        port = str(self.serialBox.GetValue())
         baudrate = str(self.baudBox.GetValue())
+        print(port,baudrate)
 
         if str(self.serialBox.GetValue()) != '' and baudrate != '':
 
             # self.textarea.SetValue('')
 
-            port = '/dev/' + str(self.serialBox.GetValue())
+            port = str(self.serialBox.GetValue())
             baudrate = str(self.baudBox.GetValue())
+            print(port,baudrate)
 
             # serial = 0
 
@@ -462,8 +435,9 @@ class programmer_gui(wx.Frame):
 
                 # Open Serial port and wait arduino to reset
 
-        port = '/dev/' + str(self.serialBox.GetValue())
+        port = str(self.serialBox.GetValue())
         baudrate = str(self.baudBox.GetValue())
+        print(port,baudrate)
 
         try:
             arduino = serial.Serial(port, int(float(baudrate)),
@@ -500,7 +474,7 @@ class programmer_gui(wx.Frame):
                 self.SetStatusText('Error Uploading ...')
                 return
 
-            arduino.write(str(gameSize).encode())
+            arduino.write((str(gameSize)+'\r').encode())
 
             val = arduino.read()                # read complete line from serial output
             if '+' in str(val):
@@ -518,7 +492,7 @@ class programmer_gui(wx.Frame):
 
             self.OnNewUpdate(gameSize, game, total, arduino, self)
         else:
-            dlg = wx.MessageDialog(self, 'Gameboy ROM file is missing', 'ROM File', wx.OK)
+            dlg = wx.MessageDialog(self, 'ROM file is missing', 'ROM File', wx.OK)
             dlg.ShowModal()
             dlg.Destroy()
 
@@ -552,17 +526,18 @@ class programmer_gui(wx.Frame):
             self.SetStatusText('Please wait ... ')
 
             self.percent = 0
-            port = '/dev/' + str(self.serialBox.GetValue())
+            port = str(self.serialBox.GetValue())
             baudrate = str(self.baudBox.GetValue())
+            print(port,baudrate)
 
             percent = 0
 
             try:
                 arduino = serial.Serial(port, int(float(baudrate)),
                         timeout=1)
-            except:
+            except Exception as e:
                 dlg = wx.MessageDialog(self,
-                        "Can't communicate with Arduino, please check serial ports"
+                        "Can't communicate with Arduino, please check serial ports ("+str(e)+")"
                         , 'Communication Problem', wx.OK)
                 dlg.ShowModal()
                 dlg.Destroy()
@@ -611,8 +586,9 @@ class programmer_gui(wx.Frame):
                 self.SetStatusText('Please wait ...')
 
                 self.percent = 0
-                port = '/dev/' + str(self.serialBox.GetValue())
+                port = str(self.serialBox.GetValue())
                 baudrate = str(self.baudBox.GetValue())
+                print(port,baudrate)
 
                 percent = 0
                 arduino = serial.Serial(port, int(float(baudrate)),
@@ -698,6 +674,16 @@ class programmer_gui(wx.Frame):
               # self.Refresh()
               # wx.MilliSleep(1)
 
+            # Wait for ack from Arduino
+            car = arduinoport.read()
+            print(car)
+            if car != '+':
+                dlg = wx.MessageDialog(self, 'Arduino did not answer', 'Programming error', wx.OK)
+                dlg.ShowModal()
+                dlg.Destroy()
+                break
+
+            
             pulse_dlg.Update(x)
 
           # self.SetStatusText("Uploading is almost finished ... ")

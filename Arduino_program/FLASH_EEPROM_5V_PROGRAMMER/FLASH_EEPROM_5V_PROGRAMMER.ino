@@ -13,64 +13,155 @@
 #include <avr/io.h>
 #include <util/delay.h>
 
-/* Flash SIZE, used only in read operation*/
-#define FLASHSIZE 131072 
+/*
+ D54 - D61=> DQ0-DQ7
+ D62 - D69=> A0-A7
+ D52 - A8
+ D50 - A9
+ D48 - A10
+ D46 - A11
+ D44 - A12
+ D42 - A13
+ D40 - A14
+ D38 - A15
+ D36 - A16
+ D34 - CE
+ D32 - WE
+ D30 - OE
+ */
 
-uint32_t address = 0;
-uint32_t gameSize = 0;
+#define DQ0_PIN 54
+#define DQ1_PIN 55
+#define DQ2_PIN 56
+#define DQ3_PIN 57
+#define DQ4_PIN 58
+#define DQ5_PIN 59
+#define DQ6_PIN 60
+#define DQ7_PIN 61
+  
+#define A0_PIN 62 /*PK0*/
+#define A0_PORT PORTK /*PK0*/
+#define A0_BIT  0 /*PK0*/
 
-char buffer[20] = {0};
-char cmd = 0;
-int  index = 0;
-char tab[10] = {0};
+#define A1_PIN 63 /*PK1*/
+#define A1_PORT PORTK /*PK1*/
+#define A1_BIT  1 /*PK1*/
 
-/* Need a fast change mode IN/OUT */
+#define A2_PIN 64 /*PK2*/
+#define A2_PORT PORTK /*PK2*/
+#define A2_BIT  2 /*PK2*/
 
-void flash_change_pins_mode(boolean io)
+#define A3_PIN 65 /*PK3*/
+#define A3_PORT PORTK /*PK3*/
+#define A3_BIT  3 /*PK3*/
+
+#define A4_PIN 66 /*PK4*/
+#define A4_PORT PORTK /*PK4*/
+#define A4_BIT  4 /*PK4*/
+
+#define A5_PIN 67 /*PK5*/
+#define A5_PORT PORTK /*PK5*/
+#define A5_BIT  5 /*PK5*/
+
+#define A6_PIN 68 /*PK6*/
+#define A6_PORT PORTK /*PK6*/
+#define A6_BIT  6 /*PK6*/
+
+#define A7_PIN 69 /*PK7*/
+#define A7_PORT PORTK /*PK7*/
+#define A7_BIT  7 /*PK7*/
+
+#define A8_PIN 52  /*PB1*/
+#define A8_PORT PORTB /*PB1*/
+#define A8_BIT  1 /*PB1*/
+
+#define A9_PIN 50  /*PB3*/
+#define A9_PORT PORTB /*PB3*/
+#define A9_BIT  3 /*PB3*/
+
+#define A10_PIN 48 /*PL1*/
+#define A10_PORT PORTL /*PL1*/
+#define A10_BIT  1 /*PL1*/
+
+#define A11_PIN 46 /*PL3*/
+#define A11_PORT PORTL /*PL3*/
+#define A11_BIT  3 /*PL3*/
+
+#define A12_PIN 44 /*PL5*/
+#define A12_PORT PORTL /*PL5*/
+#define A12_BIT  5 /*PL5*/
+
+#define A13_PIN 42 /*PL7*/
+#define A13_PORT PORTL /*PL7*/
+#define A13_BIT  7 /*PL7*/
+
+#define A14_PIN 40 /*PG1*/
+#define A14_PORT PORTG /*PG1*/
+#define A14_BIT  1 /*PG1*/
+
+#define A15_PIN 38 /*PD7*/
+#define A15_PORT PORTD /*PD7*/
+#define A15_BIT  7 /*PD7*/
+
+#define A16_PIN 36 /*PC1*/
+#define A16_PORT PORTC /*PC1*/
+#define A16_BIT  1 /*PC1*/
+
+#define A17_PIN 28 /*PA6*/
+#define A17_PORT PORTA /*PA6*/
+#define A17_BIT  6 /*PA6*/
+
+#define A18_PIN 26 /*PA4*/
+#define A18_PORT PORTA /*PA4*/
+#define A18_BIT  4 /*PA4*/
+
+#define CE_PIN 34
+#define WE_PIN 32
+#define OE_PIN 30
+
+#define DDR_DATA DDRF
+#define PORT_DATA PORTF
+#define PIN_DATA PINF
+
+#define D29F010 0x20
+#define D29F040 0xA4
+#define D29040  0x86
+int dev_id = -1; // Autodetected device ID
+
+/* Need a fast change mode IN/OUT. If io = 1, configure them as inputs, otherwise as outputs */
+void flash_change_databus_direction(boolean io)
 {
   if (io) {
-    DDRD &= ~(1<<2);
-    DDRD &= ~(1<<3);
-    DDRD &= ~(1<<4);
-    DDRD &= ~(1<<5);
-    DDRD &= ~(1<<6);
-    DDRD &= ~(1<<7);
-    DDRB &= ~(1<<0);
-    DDRB &= ~(1<<1);
+	/* Configure all as inputs */
+    DDR_DATA = 0;
   }
   else
   {
-    DDRD |= (1<<2);
-    DDRD |= (1<<3);
-    DDRD |= (1<<4);
-    DDRD |= (1<<5);
-    DDRD |= (1<<6);
-    DDRD |= (1<<7);
-    DDRB |= (1<<0);
-    DDRB |= (1<<1);
+	/* Configure all as outputs */
+    DDR_DATA = 0xFF;
   }
 }
 
 void flash_ctrl_deselect()
 {
-  digitalWrite(10, HIGH);  //CE
-  digitalWrite(12, HIGH);  //WE
-  digitalWrite(11, HIGH);  //OE
+  digitalWrite(CE_PIN, HIGH);  //CE
+  digitalWrite(WE_PIN, HIGH);  //WE
+  digitalWrite(OE_PIN, HIGH);  //OE
 }
 
 void flash_ctrl_rd()
 {
-  digitalWrite(11, LOW);
+  digitalWrite(OE_PIN, LOW);
   _delay_us(1);
-  digitalWrite(10, LOW);
+  digitalWrite(CE_PIN, LOW);
   _delay_us(1);
 }
 
 void flash_ctrl_wr()
 {
-  digitalWrite(10, LOW);
+  digitalWrite(CE_PIN, LOW);
   _delay_us(1);
-  digitalWrite(12, LOW);
+  digitalWrite(WE_PIN, LOW);
   _delay_us(1);
 }  
 
@@ -81,95 +172,113 @@ void flash_ctrl_wr()
    and do a bit manipulation to set pins High/Low
 ***************************************************/
 
-void flash_set_highest_addresses(uint16_t addr)
+void flash_set_a16_to_a18_addresses(uint16_t addr)
 { 
   /* Highest addresses */
   
-  if (addr&bit(0))
-  PORTC |= _BV(PORTC2);
+  if (addr & 1U)
+	A16_PORT |= (1U<<A16_BIT);
   else
-  PORTC &= ~_BV(PORTC2);
+	A16_PORT &= ~(1U<<A16_BIT);
   
-  if (addr&bit(1))
-  PORTC |= _BV(PORTC1);
+  if (addr & 2U)
+	A17_PORT |= (1U<<A17_BIT);
   else
-  PORTC &= ~_BV(PORTC1);
+	A17_PORT &= ~(1U<<A17_BIT);
   
-  if (addr&bit(2))
-  PORTC |= _BV(PORTC0);
+  if (addr & 4U)
+	A18_PORT |= (1U<<A18_BIT);
   else
-  PORTC &= ~_BV(PORTC0);
+	A18_PORT &= ~(1U<<A18_BIT);
 }
 
-/****
- * Shift registers manipulation
- *******************************/
-
-void flash_enable_latch()
-{
-  /* Shift register Latch */
-  digitalWrite(A4, HIGH); 
-}
-
-void flash_disable_latch()
-{
-  /* Shift register Latch */
-  digitalWrite(A4, LOW);
-}
-
-void flash_enable_serial_clock()
-{
-  /* Shift register Serial clock */
-  digitalWrite(A3, HIGH);
-}
-
-void flash_disable_serial_clock()
-{
-  digitalWrite(A3, LOW);
-}
 
 /** 
  * Calculated the given address
- * shift register manipulation
  **************************************/ 
 
-void flash_send_serial_data(uint16_t data)
+void flash_set_a0_to_a15_addresses(uint16_t addr)
 { 
-  /* Shift register manipulation */
-  /* Respect the wiring */
-  
-  uint16_t addr = 0;
-  byte octect1 = 0; 
-  byte octect2 = 0;
-  
-  addr = (data<<8);
-  octect1 = (addr>>8);
-  
-  addr = (data>>8);
-  octect2 = addr;
-  
-  flash_disable_latch();
-  for (int i=7;i>=0; i--)
-  {
-    flash_disable_serial_clock();
-    if (octect2&(1<<i))
-    PORTC |= _BV(PORTC5);
-    else
-    PORTC &= ~_BV(PORTC5);
-    flash_enable_serial_clock();
-  }
-  
-  
-  for (int i=7;i>=0; i--)
-  {
-    flash_disable_serial_clock();
-    if (octect1&(1<<i))
-    PORTC |= _BV(PORTC5);
-    else
-    PORTC &= ~_BV(PORTC5);
-    flash_enable_serial_clock();
-  }
-  flash_enable_latch();
+  if (addr & 1U)
+	A0_PORT |= (1U<<A0_BIT);
+  else
+	A0_PORT &= ~(1U<<A0_BIT);
+
+  if (addr & 2U)
+	A1_PORT |= (1U<<A1_BIT);
+  else
+	A1_PORT &= ~(1U<<A1_BIT);
+
+  if (addr & 4U)
+	A2_PORT |= (1U<<A2_BIT);
+  else
+	A2_PORT &= ~(1U<<A2_BIT);
+
+  if (addr & 8U)
+	A3_PORT |= (1U<<A3_BIT);
+  else
+	A3_PORT &= ~(1U<<A3_BIT);
+
+  if (addr & 16U)
+	A4_PORT |= (1U<<A4_BIT);
+  else
+	A4_PORT &= ~(1U<<A4_BIT);
+
+  if (addr & 32U)
+	A5_PORT |= (1U<<A5_BIT);
+  else
+	A5_PORT &= ~(1U<<A5_BIT);
+
+  if (addr & 64U)
+	A6_PORT |= (1U<<A6_BIT);
+  else
+	A6_PORT &= ~(1U<<A6_BIT);
+
+  if (addr & 128U)
+	A7_PORT |= (1U<<A7_BIT);
+  else
+	A7_PORT &= ~(1U<<A7_BIT);
+
+  if (addr & 256U)
+	A8_PORT |= (1U<<A8_BIT);
+  else
+	A8_PORT &= ~(1U<<A8_BIT);
+
+  if (addr & 512U)
+	A9_PORT |= (1U<<A9_BIT);
+  else
+	A9_PORT &= ~(1U<<A9_BIT);
+
+  if (addr & 1024U)
+	A10_PORT |= (1U<<A10_BIT);
+  else
+	A10_PORT &= ~(1U<<A10_BIT);
+
+  if (addr & 2048U)
+	A11_PORT |= (1U<<A11_BIT);
+  else
+	A11_PORT &= ~(1U<<A11_BIT);
+
+  if (addr & 4096U)
+	A12_PORT |= (1U<<A12_BIT);
+  else
+	A12_PORT &= ~(1U<<A12_BIT);
+
+  if (addr & 8192U)
+	A13_PORT |= (1U<<A13_BIT);
+  else
+	A13_PORT &= ~(1U<<A13_BIT);
+
+  if (addr & 16384U)
+	A14_PORT |= (1U<<A14_BIT);
+  else
+	A14_PORT &= ~(1U<<A14_BIT);
+
+  if (addr & 32768U)
+	A15_PORT |= (1U<<A15_BIT);
+  else
+	A15_PORT &= ~(1U<<A15_BIT);
+
 }
 
 /**
@@ -178,16 +287,12 @@ void flash_send_serial_data(uint16_t data)
 
 void flash_addr_set(uint32_t addr)
 {
-  /* Send address  to the shift register  */
+  uint16_t LSB = addr;
+  uint16_t MSB = (addr>>16);
   
-  uint16_t LSB;
-  uint16_t MSB;
-  
-  LSB = addr;
-  MSB = (addr>>16);
-  
-  flash_send_serial_data(LSB);
-  flash_set_highest_addresses(MSB);
+  flash_set_a0_to_a15_addresses(LSB);
+  flash_set_a16_to_a18_addresses(MSB);
+  _delay_us(1);
 }
 
 /**
@@ -196,48 +301,8 @@ void flash_addr_set(uint32_t addr)
 
 void flash_data_set(uint8_t data)
 {
-  uint8_t temp;
-  uint8_t temp2;
-  
-  temp = (data<<2);
-  temp2 = (data>>6);
-  
-  for (int i = 2; i < 8; i++)
-  {
-    if (temp&bit(i))
-    {
-      DDRD |= (1<<i);
-      PORTD |= (1<<i);
-    }
-    else
-    {
-      PORTD &= ~(1<<i);
-      DDRD &= ~(1<<i);  
-    }
-   
-  }
-  
-  if(temp2&(1<<0)) 
-  {
-    DDRB |= _BV(PORTB0);
-    PORTB |= _BV(PORTB0);
-  }
-  else
-  {
-    PORTB &= ~_BV(PORTB0);
-    DDRB &= ~(1<<0);
-  }
-  
-  if(temp2&(1<<1))
-  {
-    DDRB |= _BV(PORTB1);
-    PORTB |= _BV(PORTB1);
-  }
-  else
-  {
-    PORTB &= ~_BV(PORTB1);
-    DDRB &= ~_BV(PORTB1);
-  }
+  PORT_DATA = data;
+  _delay_us(1);
 }
 
 /** 
@@ -247,22 +312,7 @@ void flash_data_set(uint8_t data)
 
 byte flash_data_get()
 {
-  /* get data from data bus */
-  
-  byte data = 0;
-  boolean state = LOW;
-  boolean state2 = LOW;
-  
-  for (int i = 2, j = 0; i <= 9; i++, j++)
-  {
-        state = digitalRead(i);  
-        state2 = digitalRead(i); 
-        if (state == state2)
-           if (state == HIGH)
-           bitWrite(data, j, HIGH); 
-           
-  }
-  return data;
+  return PIN_DATA;
 }
 
 /*
@@ -272,11 +322,22 @@ byte flash_data_get()
 boolean flash_DQ7_byte_poll(uint32_t addr, byte data)
 {
   byte octect = 0;
-  flash_change_pins_mode(1);
+  flash_change_databus_direction(1); // Config as inputs
   flash_addr_set(addr);
   flash_ctrl_rd();
-  octect = (flash_data_get()>>7);
-  while (octect!=(data>>7));
+  
+  uint32_t loops = 1000000UL;
+  octect = flash_data_get();
+  while (((octect ^ data) & 0x80) != 0 && --loops != 0UL)
+	octect = flash_data_get();
+  if (!loops) {
+	Serial.println("Timeout on flash_DQ7_byte_poll");
+	Serial.print("read:");
+	Serial.print(octect,HEX);
+	Serial.print(" sent:");
+	Serial.println(data,HEX);
+  }
+
   flash_ctrl_deselect();
   return true;
 }
@@ -284,14 +345,17 @@ boolean flash_DQ7_byte_poll(uint32_t addr, byte data)
 boolean flash_DQ7_erase_poll()
 {
   byte octect = 0;
-  flash_change_pins_mode(1);
-  octect = (flash_data_get()>>7);
+  flash_change_databus_direction(1); // Config as inputs
   
-  while (octect!=1)
-  octect = (flash_data_get()>>7);
+  uint32_t loops = 1000000UL;
+  octect = flash_data_get();
+  while ((octect & 0x80) != 0x80 && --loops != 0UL)
+	octect = flash_data_get();
+  if (!loops)
+	Serial.println("Timeout on flash_DQ7_erase_poll");
   
   if (octect)
-  Serial.println("Erasure complete");
+	Serial.println("Erasure complete");
   
   flash_ctrl_deselect();
   return true;
@@ -306,11 +370,8 @@ void flash_send_command(uint32_t addr, uint8_t data)
   /* Send command sequence */
   
   flash_addr_set(addr);
-  delayMicroseconds(1);
-  flash_ctrl_wr();
-
   flash_data_set(data);
-  delayMicroseconds(1);
+  flash_ctrl_wr();
 }
 
 /****
@@ -318,7 +379,7 @@ void flash_send_command(uint32_t addr, uint8_t data)
  * It's useful to test the chip before any operation
  ******************************************************/
 
-void flash_device_id()
+void flash_device_id_10(bool display)
 {
   /* This is used to get code identification 
    * from the chip in autoselect mode
@@ -327,15 +388,14 @@ void flash_device_id()
   
   flash_ctrl_deselect();
   
-  //digitalWrite(11, HIGH);
+  //digitalWrite(OE_PIN, HIGH);
   
   delay(1000);
   
-  flash_change_pins_mode(0);
+  flash_change_databus_direction(0); // Config as outputs
   
   flash_send_command(0x5555, 0xAA);
   flash_ctrl_deselect();
-  
   
   flash_send_command(0x2AAA, 0x55);
   flash_ctrl_deselect();
@@ -345,14 +405,18 @@ void flash_device_id()
  
   delay(1000);
   
-  flash_change_pins_mode(1);
+  flash_change_databus_direction(1); // Config as inputs
 
-  flash_addr_set(0x01);
+  flash_addr_set(0x01); // Device ID
   delay(1);
   flash_ctrl_rd();
   
-  Serial.print(flash_data_get(), HEX);
-  //Serial.print("Get device ID complete, Please wait restarting the chip ... ");
+  byte d = flash_data_get();
+  dev_id = d; // Store device ID
+  if (display) {
+	Serial.print(d, HEX);
+	//Serial.print("Get device ID complete, Please wait restarting the chip ... ");
+  }
   delay(1);
   flash_reset_chip();
   //Serial.println("Done.");
@@ -363,22 +427,20 @@ void flash_device_id()
 /** AM29F040 **/
 /***************/
 
-void flash_get_id_40()
+void flash_device_id_40()
 {
   /* This is used to get code identification 
    * from the chip in autoselect mode
    * See the datasheet
    ******************************************/
-   
-  byte data = 0x00;
   
   flash_ctrl_deselect();
   
-  //digitalWrite(11, HIGH);
+  //digitalWrite(OE_PIN, HIGH);
   
   delay(1000);
   
-  flash_change_pins_mode(0);
+  flash_change_databus_direction(0); // Config as outputs
   
   flash_send_command(0x555, 0xAA);
   flash_ctrl_deselect();
@@ -391,26 +453,34 @@ void flash_get_id_40()
  
   delay(1000);
   
-  flash_change_pins_mode(1);
+  flash_change_databus_direction(1); // Config as inputs
 
-  flash_addr_set(0x00);
+  flash_addr_set(0x01); // Device ID
+  delay(1);
   flash_ctrl_rd();
   
-  data = flash_data_get();
-  
-  if (data < 0x0A) 
-  Serial.print("0");
-  
-  Serial.print(data, HEX);
-  
-  flash_ctrl_deselect();
-  
+  Serial.print(flash_data_get(), HEX);
+  //Serial.print("Get device ID complete, Please wait restarting the chip ... ");
+  delay(1);
   flash_reset_chip();
+  //Serial.println("Done.");
   delay(1000);
+  flash_ctrl_deselect();
 }
 
+void flash_device_id()
+{
+	if (dev_id == -1)
+		flash_device_id_10(false);
+	
+	if (dev_id == D29F010) {
+		flash_device_id_10(true);
+	} else {
+		flash_device_id_40();
+	}
+}
 
-void flash_get_id()
+void flash_manufacturer_id_10()
 {
   /* This is used to get code identification 
    * from the chip in autoselect mode
@@ -421,11 +491,9 @@ void flash_get_id()
   
   flash_ctrl_deselect();
   
-  //digitalWrite(11, HIGH);
-  
   delay(1000);
   
-  flash_change_pins_mode(0);
+  flash_change_databus_direction(0); // Config as outputs
   
   flash_send_command(0x5555, 0xAA);
   flash_ctrl_deselect();
@@ -438,16 +506,14 @@ void flash_get_id()
  
   delay(1000);
   
-  flash_change_pins_mode(1);
+  flash_change_databus_direction(1); // Config as inputs
   
-  flash_addr_set(0x00);
+  flash_addr_set(0x00); // Manufacturer ID
   flash_ctrl_rd();
   
   data = flash_data_get();
-  
-  if (data < 0x0A) 
-  Serial.print("0");
-  
+  if (data < 0x10) 
+	Serial.print("0");
   Serial.print(data, HEX);
   
   flash_ctrl_deselect();
@@ -456,12 +522,72 @@ void flash_get_id()
   delay(1000);
 }
 
-void flash_read_memory(uint32_t addr)
+void flash_manufacturer_id_40()
 {
-  /* Read the chip until the address given */  
-  int c = 0;
+  /* This is used to get code identification 
+   * from the chip in autoselect mode
+   * See the datasheet
+   ******************************************/
+   
+  byte data = 0x00;
   
-  flash_change_pins_mode(1);
+  flash_ctrl_deselect();
+  
+  delay(1000);
+  
+  flash_change_databus_direction(0); // Config as outputs
+  
+  flash_send_command(0x555, 0xAA);
+  flash_ctrl_deselect();
+  
+  flash_send_command(0x2AA, 0x55);
+  flash_ctrl_deselect();
+  
+  flash_send_command(0x555, 0x90);
+  flash_ctrl_deselect();
+ 
+  delay(1000);
+  
+  flash_change_databus_direction(1); // Config as inputs
+  
+  flash_addr_set(0x00); // Manufacturer ID
+  flash_ctrl_rd();
+  
+  data = flash_data_get();
+  if (data < 0x10) 
+	Serial.print("0");
+  Serial.print(data, HEX);
+  
+  flash_ctrl_deselect();
+  
+  flash_reset_chip();
+  delay(1000);
+}
+
+void flash_manufacturer_id()
+{
+	if (dev_id == -1)
+		flash_device_id_10(false);
+	
+	if (dev_id == D29F010) {
+		flash_manufacturer_id_10();
+	} else {
+		flash_manufacturer_id_40();
+	}
+}
+
+
+void flash_read_memory()
+{
+  uint32_t addr;
+  if (dev_id == -1)
+	flash_device_id_10(false);
+
+  // Determine maximum address to read
+  addr = dev_id == D29F010 ? 0x20000UL : 0x80000UL;
+	
+  /* Read the chip until the address given */  
+  flash_change_databus_direction(1); // Config as inputs
   
   for (uint32_t i = 0; i < addr; i++)
   {
@@ -471,7 +597,11 @@ void flash_read_memory(uint32_t addr)
     
     flash_ctrl_rd();
     
-    Serial.print(flash_data_get(),HEX); 
+	byte data = flash_data_get();
+	if (data < 0x10) 
+		Serial.print("0");
+	Serial.print(data, HEX);
+  	
     flash_ctrl_deselect();
   }
 }
@@ -481,9 +611,11 @@ void flash_read_memory(uint32_t addr)
  * 0x555 0x2AA is for AM29F040 A29F040
  ********************************************************/
 
-boolean flash_program_byte(uint32_t addr, uint8_t data)
+boolean flash_program_byte_10(uint32_t addr, uint8_t data)
 {
   flash_ctrl_deselect();
+  
+  flash_change_databus_direction(0); // Config as outputs
   
   flash_send_command(0x5555, 0xAA); 
   flash_ctrl_deselect();
@@ -499,9 +631,46 @@ boolean flash_program_byte(uint32_t addr, uint8_t data)
   flash_ctrl_deselect();
   
   /** Data Polling **/
-  while (!flash_DQ7_byte_poll(addr, data));
-  
+  flash_DQ7_byte_poll(addr, data);
+
   return true;
+}
+
+boolean flash_program_byte_40(uint32_t addr, uint8_t data)
+{
+  flash_ctrl_deselect();
+  
+  flash_change_databus_direction(0); // Config as outputs
+  
+  flash_send_command(0x555, 0xAA); 
+  flash_ctrl_deselect();
+  
+  flash_send_command(0x2AA, 0x55);
+  flash_ctrl_deselect();
+  
+  flash_send_command(0x555, 0xA0);
+  flash_ctrl_deselect();
+  
+  //Program Address & Program data
+  flash_send_command(addr, data);
+  flash_ctrl_deselect();
+  
+  /** Data Polling **/
+  flash_DQ7_byte_poll(addr, data);
+
+  return true;
+}
+
+boolean flash_program_byte(uint32_t addr, uint8_t data)
+{
+	if (dev_id == -1)
+		flash_device_id_10(false);
+	
+	if (dev_id == D29F010) {
+		return flash_program_byte_10(addr,data);
+	} else {
+		return flash_program_byte_40(addr,data);
+	}
 }
 
 /* This is the sequence to program a byte on the memory *
@@ -509,11 +678,13 @@ boolean flash_program_byte(uint32_t addr, uint8_t data)
  * 0x555 0x2AA is for AM29F040 A29F040
  ********************************************************/
 
-void flash_reset_chip()
+void flash_reset_chip_10()
 {
   /* This is reset command for the AM29F010 */
   
   flash_ctrl_deselect();
+  
+  flash_change_databus_direction(0); // Config as outputs
   
   flash_send_command(0x5555, 0xAA);
   flash_ctrl_deselect();
@@ -527,17 +698,50 @@ void flash_reset_chip()
   delay(1000);
 }
 
+void flash_reset_chip_40()
+{
+  /* This is reset command for the AM29F010 */
+  
+  flash_ctrl_deselect();
+  
+  flash_change_databus_direction(0); // Config as outputs
+  
+  flash_send_command(0x555, 0xAA);
+  flash_ctrl_deselect();
+  
+  flash_send_command(0x2AA, 0x55);
+  flash_ctrl_deselect();
+  
+  flash_send_command(0x555, 0xF0);
+  flash_ctrl_deselect();
+  
+  delay(1000);
+}
+
+void flash_reset_chip()
+{
+	if (dev_id == -1)
+		flash_device_id_10(false);
+	
+	if (dev_id == D29F010) {
+		flash_reset_chip_10();
+	} else {
+		flash_reset_chip_40();
+	}
+}
+
+
 /* This is the sequence to program a byte on the memory *
  * 0x5555 0x2AAA is for AM29F010
  * 0x555 0x2AA is for AM29F040 A29F040
  ********************************************************/
 
-void flash_erase_memory()
+void flash_erase_memory_10()
 {
   flash_ctrl_deselect();
   delay(1000);
   
-  //flash_change_pins_mode(0);
+  flash_change_databus_direction(0); // Config as outputs
   
   flash_send_command(0x5555, 0xAA);
   flash_ctrl_deselect();
@@ -566,12 +770,12 @@ void flash_erase_memory()
 /* To erase AM29F040 */
 /*********************/
 
-void flash_erase_memory2()
+void flash_erase_memory_40()
 {
   flash_ctrl_deselect();
   delay(1000);
   
-  //flash_change_pins_mode(0);
+  flash_change_databus_direction(0); // Config as outputs
   
   flash_send_command(0x555, 0xAA);
   flash_ctrl_deselect();
@@ -593,21 +797,20 @@ void flash_erase_memory2()
   
   _delay_ms(1000);
   //flash_DQ7_erase_poll();
-  //flash_reset_chip();
+  flash_reset_chip();
   Serial.print("Erasure Complete");
 }
 
-/*
- * Read data coming from the computer's USB port *
- *************************************************/
-
-void receiveDataFromPC()
+void flash_erase_memory()
 {
-  if (Serial.available()>0)
-  {
-    uint8_t data = Serial.read();
-    flash_program_byte(address++, data); 
-  }
+	if (dev_id == -1)
+		flash_device_id_10(false);
+	
+	if (dev_id == D29F010) {
+		flash_erase_memory_10();
+	} else {
+		flash_erase_memory_40();
+	}
 }
 
 /* Intiate the programing when the python GUI send a trigger */
@@ -615,23 +818,37 @@ void receiveDataFromPC()
 
 void startProgramming()
 {
-    flash_change_pins_mode(0);
+	uint32_t address = 0;
+	
+    flash_change_databus_direction(0); // Config as outputs
     
     Serial.print("+");
-    while (!Serial.available());
-    while (Serial.available() > 0)
-    {
+    
+	int index = 0;
+	char tab[10] = {0};
+	
+    while (1) {
+	  // Wait for a character
+	  while (!Serial.available());
+	  
       char car = Serial.read();
-      delay(10);
+	  if (car == '\r')
+		  break;
+	  
       tab[index++]=car;
-      
     }
     tab[index] = '\0';
     
     Serial.print("+");
-    
-    while(address <= atol(tab)) {
-    receiveDataFromPC();
+	
+    uint32_t maxaddr = (uint32_t)atol(tab);
+    while(address <= maxaddr) {
+	  // Wait for a character
+	  while (!Serial.available());
+
+  	  uint8_t data = Serial.read();
+	  flash_program_byte(address++, data); 
+	  Serial.print("+");
     }
 }
 
@@ -640,80 +857,85 @@ void setup()
   Serial.begin(115200);
   //ANALOG_CONFIG;
   
-  int c = 0;
- 
-  //Set the shift register pins
-  
-  pinMode(A5, OUTPUT);
-  pinMode(A4, OUTPUT);
-  pinMode(A3, OUTPUT);
-  
-  //set the highest address pins
-  
-  pinMode(A2, OUTPUT);
-  pinMode(A1, OUTPUT);
-  pinMode(A0, OUTPUT);
-  
-  //Set the chip controller
-  
-  pinMode(10, OUTPUT);
-  pinMode(11, OUTPUT);
-  pinMode(12, OUTPUT);
-  
   //Set data pin mode
-  pinMode(2, OUTPUT);
-  pinMode(3, OUTPUT);
-  pinMode(4, OUTPUT);
-  pinMode(5, OUTPUT);
-  pinMode(6, OUTPUT);
-  pinMode(7, OUTPUT);
-  pinMode(8, OUTPUT);
-  pinMode(9, OUTPUT);
+  pinMode(DQ0_PIN, INPUT);
+  pinMode(DQ1_PIN, INPUT);
+  pinMode(DQ2_PIN, INPUT);
+  pinMode(DQ3_PIN, INPUT);
+  pinMode(DQ4_PIN, INPUT);
+  pinMode(DQ5_PIN, INPUT);
+  pinMode(DQ6_PIN, INPUT);
+  pinMode(DQ7_PIN, INPUT);
+ 
+  //set the highest address pins
+  pinMode(A0_PIN, OUTPUT);
+  pinMode(A1_PIN, OUTPUT);
+  pinMode(A2_PIN, OUTPUT);
+  pinMode(A3_PIN, OUTPUT);
+  pinMode(A4_PIN, OUTPUT);
+  pinMode(A5_PIN, OUTPUT);
+  pinMode(A6_PIN, OUTPUT);
+  pinMode(A7_PIN, OUTPUT);
+  pinMode(A8_PIN, OUTPUT);
+  pinMode(A9_PIN, OUTPUT);
+  pinMode(A10_PIN, OUTPUT);
+  pinMode(A11_PIN, OUTPUT);
+  pinMode(A12_PIN, OUTPUT);
+  pinMode(A13_PIN, OUTPUT);
+  pinMode(A14_PIN, OUTPUT);
+  pinMode(A15_PIN, OUTPUT);
+  pinMode(A16_PIN, OUTPUT);
+  pinMode(A17_PIN, OUTPUT);
+  pinMode(A18_PIN, OUTPUT);
+
+  //Set the chip controller
+  pinMode(CE_PIN, OUTPUT);
+  pinMode(WE_PIN, OUTPUT);
+  pinMode(OE_PIN, OUTPUT);
+
+  digitalWrite(CE_PIN, HIGH);
+  digitalWrite(WE_PIN, HIGH);
+  digitalWrite(OE_PIN, HIGH);
   
   delay(1000);
-  
-  address = 0;
   
   flash_ctrl_deselect();
 }
 
 void loop()
 { 
-  while (!Serial.available());
-  cmd = Serial.read();
+  if (!Serial.available())
+	  return;
   
+  char cmd = Serial.read();
   switch(cmd)
   {
     case 'R':
-    flash_read_memory(0xFF);
-    Serial.println("");
+		flash_read_memory();
+		Serial.println("");
     break;
     
     case 'E':
-    flash_erase_memory();
-    Serial.println("");
+		flash_erase_memory();
+		Serial.println("");
     break;
     
     case 'W':
-    startProgramming();
-    Serial.println("");
+		startProgramming();
+		Serial.println("");
     break;
     
-    case 'I':
-    flash_get_id();
-    Serial.println("");
+    case 'I': // Manufacturer ID
+		flash_manufacturer_id();
+		Serial.println("");
     break;
     
-    case 'D':
-    flash_device_id();
-    Serial.println("");
+    case 'D': // Device ID
+		flash_device_id();
+		Serial.println("");
     break;
   
     default:
-    cmd = 0;
+		break;
   }
-  cmd = 0;
-  index = 0;
-  memset(tab, '\0', sizeof(tab));
-  delay(10);
 }
