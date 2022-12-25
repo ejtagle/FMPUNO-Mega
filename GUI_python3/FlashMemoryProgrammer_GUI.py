@@ -302,6 +302,8 @@ class programmer_gui(wx.Frame):
 
             car = car + str("%06x" % linecount) + '\t'
 
+            game = open(self.uploadText.GetValue(), 'wb')
+
             command = 'R'
             arduino.write(command.encode())
 
@@ -317,6 +319,8 @@ class programmer_gui(wx.Frame):
                     # long values might require multiple passes
             val = val.decode()                  # decoding from bytes
             val = val.strip()                   # stripping leading and trailing spaces.
+            
+            game.write(bytes.fromhex(val))
             
             for value in str(val):
                 car = car + value
@@ -622,12 +626,18 @@ class programmer_gui(wx.Frame):
                     self.flashref.SetValue('AMD ')
                 if man == '37':
                     self.flashref.SetValue('AMIC ')
-                if man != '37' and man != '01':
+                if man != '37' and man != '01' and man != 'C3' and man != '83':
                     self.flashref.SetValue('No chip found')
 
                 if ref == '20':
                     self.flashref.SetValue(self.flashref.GetValue()
                             + 'AM29F010B')
+                if ref == 'C3':
+                    self.flashref.SetValue(self.flashref.GetValue()
+                            + 'M27C1001')
+                if ref == '83':
+                    self.flashref.SetValue(self.flashref.GetValue()
+                            + 'M27C1001')
                 if ref == 'A4':
                     self.flashref.SetValue(self.flashref.GetValue()
                             + 'AM29F040B')

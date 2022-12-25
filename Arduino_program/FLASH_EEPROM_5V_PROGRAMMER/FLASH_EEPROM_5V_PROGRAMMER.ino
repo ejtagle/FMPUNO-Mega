@@ -13,6 +13,8 @@
 #include <avr/io.h>
 #include <util/delay.h>
 
+#define ACCESS_DELAY 10
+
 /*
  D54 - D61=> DQ0-DQ7
  D62 - D69=> A0-A7
@@ -123,6 +125,8 @@
 #define PORT_DATA PORTF
 #define PIN_DATA PINF
 
+#define D27M1001 0xC3
+#define D27M1001_V2 0x83
 #define D29F010 0x20
 #define D29F040 0xA4
 #define D29040  0x86
@@ -147,22 +151,23 @@ void flash_ctrl_deselect()
   digitalWrite(CE_PIN, HIGH);  //CE
   digitalWrite(WE_PIN, HIGH);  //WE
   digitalWrite(OE_PIN, HIGH);  //OE
+  _delay_us(ACCESS_DELAY);
 }
 
 void flash_ctrl_rd()
 {
   digitalWrite(OE_PIN, LOW);
-  _delay_us(1);
+  _delay_us(ACCESS_DELAY);
   digitalWrite(CE_PIN, LOW);
-  _delay_us(1);
+  _delay_us(ACCESS_DELAY);
 }
 
 void flash_ctrl_wr()
 {
   digitalWrite(CE_PIN, LOW);
-  _delay_us(1);
+  _delay_us(ACCESS_DELAY);
   digitalWrite(WE_PIN, LOW);
-  _delay_us(1);
+  _delay_us(ACCESS_DELAY);
 }  
 
 /**************************************************
@@ -292,7 +297,7 @@ void flash_addr_set(uint32_t addr)
   
   flash_set_a0_to_a15_addresses(LSB);
   flash_set_a16_to_a18_addresses(MSB);
-  _delay_us(1);
+  _delay_us(ACCESS_DELAY);
 }
 
 /**
@@ -302,7 +307,7 @@ void flash_addr_set(uint32_t addr)
 void flash_data_set(uint8_t data)
 {
   PORT_DATA = data;
-  _delay_us(1);
+  _delay_us(ACCESS_DELAY);
 }
 
 /** 
@@ -312,6 +317,7 @@ void flash_data_set(uint8_t data)
 
 byte flash_data_get()
 {
+  _delay_us(ACCESS_DELAY);
   return PIN_DATA;
 }
 
@@ -473,7 +479,7 @@ void flash_device_id()
 	if (dev_id == -1)
 		flash_device_id_10(false);
 	
-	if (dev_id == D29F010) {
+	if (dev_id == D29F010 || dev_id == D27M1001 || dev_id == D27M1001_V2) {
 		flash_device_id_10(true);
 	} else {
 		flash_device_id_40();
@@ -569,7 +575,7 @@ void flash_manufacturer_id()
 	if (dev_id == -1)
 		flash_device_id_10(false);
 	
-	if (dev_id == D29F010) {
+	if (dev_id == D29F010 || dev_id == D27M1001 || dev_id == D27M1001_V2) {
 		flash_manufacturer_id_10();
 	} else {
 		flash_manufacturer_id_40();
@@ -584,7 +590,7 @@ void flash_read_memory()
 	flash_device_id_10(false);
 
   // Determine maximum address to read
-  addr = dev_id == D29F010 ? 0x20000UL : 0x80000UL;
+  addr = (dev_id == D29F010 || dev_id == D27M1001 || dev_id == D27M1001_V2) ? 0x20000UL : 0x80000UL;
 	
   /* Read the chip until the address given */  
   flash_change_databus_direction(1); // Config as inputs
@@ -666,7 +672,7 @@ boolean flash_program_byte(uint32_t addr, uint8_t data)
 	if (dev_id == -1)
 		flash_device_id_10(false);
 	
-	if (dev_id == D29F010) {
+	if (dev_id == D29F010 || dev_id == D27M1001 || dev_id == D27M1001_V2) {
 		return flash_program_byte_10(addr,data);
 	} else {
 		return flash_program_byte_40(addr,data);
@@ -723,7 +729,7 @@ void flash_reset_chip()
 	if (dev_id == -1)
 		flash_device_id_10(false);
 	
-	if (dev_id == D29F010) {
+	if (dev_id == D29F010 || dev_id == D27M1001 || dev_id == D27M1001_V2) {
 		flash_reset_chip_10();
 	} else {
 		flash_reset_chip_40();
@@ -806,7 +812,7 @@ void flash_erase_memory()
 	if (dev_id == -1)
 		flash_device_id_10(false);
 	
-	if (dev_id == D29F010) {
+	if (dev_id == D29F010 || dev_id == D27M1001 || dev_id == D27M1001_V2) {
 		flash_erase_memory_10();
 	} else {
 		flash_erase_memory_40();
