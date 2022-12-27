@@ -287,7 +287,7 @@ class programmer_gui(wx.Frame):
 
             try:
                 arduino = serial.Serial(port, int(float(baudrate)),
-                        timeout=1)
+                        timeout=30)
             except:
                 dlg = wx.MessageDialog(self,
                         "Can't communicate with Arduino, please check serial ports !!!"
@@ -382,7 +382,7 @@ class programmer_gui(wx.Frame):
 
             try:
                 arduino = serial.Serial(port, int(float(baudrate)),
-                        timeout=1)
+                        timeout=30)
             except:
                 dlg = wx.MessageDialog(self,
                         "Can't communicate with Arduino, please check serial ports"
@@ -445,7 +445,7 @@ class programmer_gui(wx.Frame):
 
         try:
             arduino = serial.Serial(port, int(float(baudrate)),
-                                    timeout=1)
+                                    timeout=30)
         except:
             dlg = wx.MessageDialog(self,
                                    "Can't communicate with Arduino, please check serial ports", 'Communication Problem', wx.OK)
@@ -538,7 +538,7 @@ class programmer_gui(wx.Frame):
 
             try:
                 arduino = serial.Serial(port, int(float(baudrate)),
-                        timeout=1)
+                        timeout=30)
             except Exception as e:
                 dlg = wx.MessageDialog(self,
                         "Can't communicate with Arduino, please check serial ports ("+str(e)+")"
@@ -596,7 +596,7 @@ class programmer_gui(wx.Frame):
 
                 percent = 0
                 arduino = serial.Serial(port, int(float(baudrate)),
-                        timeout=1)
+                        timeout=30)
                 time.sleep(2)
 
                 response2 = '0x'
@@ -687,7 +687,7 @@ class programmer_gui(wx.Frame):
             # Wait for ack from Arduino
             car = arduinoport.read()
             print(car)
-            if car != '+':
+            if '+' not in str(car):
                 dlg = wx.MessageDialog(self, 'Arduino did not answer', 'Programming error', wx.OK)
                 dlg.ShowModal()
                 dlg.Destroy()
