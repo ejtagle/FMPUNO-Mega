@@ -30,7 +30,17 @@
  D34 - CE
  D32 - WE
  D30 - OE
+ 
+ D28 - OE_12V
+ D29 - A9_12V
  */
+
+#define CE_PIN 34
+#define WE_PIN 32
+#define OE_PIN 30
+#define OE12V_PIN 28
+#define A912V_PIN 29
+
 
 #define DQ0_PIN 54
 #define DQ1_PIN 55
@@ -117,9 +127,6 @@
 #define A18_PORT PORTA /*PA4*/
 #define A18_BIT  4 /*PA4*/
 
-#define CE_PIN 34
-#define WE_PIN 32
-#define OE_PIN 30
 
 #define DDR_DATA DDRF
 #define PORT_DATA PORTF
@@ -132,6 +139,12 @@
 #define D29040  0x86
 
 int dev_id = -1; // Autodetected device ID
+
+void flash_enable_oe_12v(boolean enable) {
+}
+
+void flash_enable_a9_12v(boolean enable) {
+}
 
 /* Need a fast change mode IN/OUT. If io = 1, configure them as inputs, otherwise as outputs */
 void flash_change_databus_direction(boolean io)
@@ -156,14 +169,14 @@ void flash_ctrl_deselect()
 
 void flash_ctrl_rd()
 {
+	digitalWrite(OE_PIN, LOW);
   digitalWrite(CE_PIN, LOW);
-  digitalWrite(OE_PIN, LOW);
 }
 
 void flash_ctrl_wr()
 {
+	digitalWrite(WE_PIN, LOW);
   digitalWrite(CE_PIN, LOW);
-  digitalWrite(WE_PIN, LOW);
 }  
 
 
@@ -289,77 +302,15 @@ uint8_t flash_data_get()
   return PIN_DATA;
 }
 
-/*
- * Data polling in programming operation
- *****************************************/
-boolean flash_DQ7_byte_poll(uint32_t addr, uint8_t data)
-{
-  boolean ret = true;
-  
-  uint8_t octect = 0;
-  flash_change_databus_direction(1); // Config as inputs
-  flash_addr_set(addr);
-  _delay_us(ACCESS_DELAY); // Give some time for address stabilization
-  flash_ctrl_rd();
-  _delay_us(ACCESS_DELAY); // Give some time for read access
-  
-  uint8_t loops = 140U; // at 20 mhz, 7us is 140 cycles
-  octect = flash_data_get();
-  while (((octect ^ data) & 0x80U) != 0U && --loops != 0U)
-    octect = flash_data_get();
-  if (!loops) {
-    ret = false;
-/*     
-    Serial.println("Timeout on flash_DQ7_byte_poll");
-    Serial.print(" read:");
-    Serial.print(octect,HEX);
-    Serial.print(" sent:");
-    Serial.println(data,HEX);
- */
-  }
-
-  flash_ctrl_deselect();
-  _delay_us(ACCESS_DELAY); // Give some time for deselection
-  return ret;
-}
-
-boolean flash_DQ7_erase_poll()
-{
-  boolean ret = true;
-  
-  uint8_t octect = 0;
-  flash_change_databus_direction(1); // Config as inputs
-  flash_addr_set(0);
-  _delay_us(ACCESS_DELAY); // Give some time for address stabilization
-  flash_ctrl_rd();
-  _delay_us(ACCESS_DELAY); // Give some time for read access
-  
-  uint32_t loops = 1280000000UL; // Up to 64 seconds, at 20 mhz
-  octect = flash_data_get();
-  while ((octect & 0x80U) != 0x80U && --loops != 0UL)
-    octect = flash_data_get();
-
-  if (!loops) {
-    //Serial.println("Timeout on flash_DQ7_erase_poll");
-    ret = false;
-  } else {
-    if (octect) {
-      //Serial.println("Erasure complete");
-      ret = true;
-    }
-  }
-  
-  flash_ctrl_deselect();
-  _delay_us(ACCESS_DELAY); // Give some time for deselection
-  return ret;
-}
-
 /****
  * Set command sequence and send it to the chip
  ***********************************************/
 
-void flash_send_command(uint32_t addr, uint8_t data)
+void flash_send(uint32_t addr, uint8_t data)
 {
+	/* Config as outputs */
+	flash_change_databus_direction(0); 
+	
   /* Send command sequence */
   flash_addr_set(addr);
   flash_data_set(data);
@@ -368,6 +319,140 @@ void flash_send_command(uint32_t addr, uint8_t data)
   _delay_us(ACCESS_DELAY); // Give some time for write
   flash_ctrl_deselect();
   _delay_us(ACCESS_DELAY); // Give some time for deselection
+}
+
+uint8_t flash_read(uint32_t addr)
+{
+	flash_change_databus_direction(1); // Config as inputs
+	
+  flash_addr_set(addr);
+  _delay_us(ACCESS_DELAY); // Give some time for address setup
+  flash_ctrl_rd();
+  _delay_us(ACCESS_DELAY); // Give some time for read access
+  uint8_t d = flash_data_get();
+  flash_ctrl_deselect();
+  _delay_us(ACCESS_DELAY); // Give some time for deselection
+
+	return d;
+}
+
+
+/*
+ * Data polling in programming operation
+ *****************************************/
+boolean flash_DQ7_byte_poll(uint32_t addr, uint8_t data)
+{
+	boolean ret = true;
+	
+	// Toggle bit polling
+	flash_change_databus_direction(1); // Config as inputs
+	flash_addr_set(addr);
+
+	/* Enable chip access */
+	digitalWrite(OE_PIN, LOW);  //OE
+	
+	/* Data polling algorithm */
+	uint8_t rd = 0;
+	uint16_t loops = 1000U; // at 20 mhz, 7us is 140 cycles
+	do {
+		// Read status
+		digitalWrite(CE_PIN, LOW);  //CE
+		_delay_us(ACCESS_DELAY); // Give some time for read access
+		rd = flash_data_get();
+		digitalWrite(CE_PIN, HIGH);  //CE
+		_delay_us(ACCESS_DELAY); 
+  } while (
+		((rd ^ data) & 0x80U) != 0 && /* Data still not valid */
+		(rd & 0x20) == 0 && /* And Q5 = 0 (not timed out) */
+		--loops != 0U /* And no internal timeout */
+	);
+
+	/* Internal polling timeout: Failure */
+  if (!loops) {
+    ret = false;
+  } else {
+		/* Either operation timed out, or success */
+		
+		/* If operation timed out */
+		if ( (rd & 0x20) != 0 ) { 
+		
+			// Read status again
+			digitalWrite(CE_PIN, LOW);  //CE
+			_delay_us(ACCESS_DELAY); // Give some time for read access
+			rd = flash_data_get();
+			digitalWrite(CE_PIN, HIGH);  //CE
+			_delay_us(ACCESS_DELAY); 
+
+			/* If data still not valid, failure*/
+			if (((rd ^ data) & 0x80U) != 0) {
+				ret = false;
+			}
+		} /* Success */
+	}
+	
+	/* Deselect chip */
+	digitalWrite(OE_PIN, HIGH);  //OE
+	_delay_us(ACCESS_DELAY); 
+
+  return ret;
+}
+
+boolean flash_DQ7_erase_poll()
+{
+	boolean ret = true;
+	
+	// Toggle bit polling
+	flash_change_databus_direction(1); // Config as inputs
+	flash_addr_set(0);
+
+	/* Enable chip access */
+	digitalWrite(OE_PIN, LOW);  //OE
+	digitalWrite(CE_PIN, HIGH);  //CE
+	
+	/* Data polling algorithm */
+	uint8_t rd = 0;
+	uint16_t loops = 1000U; // at 20 mhz, 7us is 140 cycles
+	do {
+		// Read status
+		digitalWrite(CE_PIN, LOW);  //CE
+		_delay_us(ACCESS_DELAY); // Give some time for read access
+		rd = flash_data_get();
+		digitalWrite(CE_PIN, HIGH);  //CE
+		_delay_us(ACCESS_DELAY); 
+  } while (
+		(rd & 0x80) == 0 && /* Erase still running */
+		(rd & 0x20) == 0 && /* And Q5 = 0 (not timed out) */
+		--loops != 0U /* And no internal timeout */
+	);
+
+	/* Internal polling timeout: Failure */
+  if (!loops) {
+    ret = false;
+  } else {
+		/* Either operation timed out, or success */
+		
+		/* If operation timed out */
+		if ( (rd & 0x20) != 0 ) { 
+		
+			// Read status again
+			digitalWrite(CE_PIN, LOW);  //CE
+			_delay_us(ACCESS_DELAY); // Give some time for read access
+			rd = flash_data_get();
+			digitalWrite(CE_PIN, HIGH);  //CE
+			_delay_us(ACCESS_DELAY); 
+
+			/* If data still not valid, failure*/
+			if ((rd & 0x80) == 0) { /* Erase still running */
+				ret = false;
+			}
+		} /* Success */
+	}
+	
+	/* Deselect chip */
+	digitalWrite(OE_PIN, HIGH);  //OE
+	_delay_us(ACCESS_DELAY); 
+
+  return ret;
 }
 
 /****
@@ -381,21 +466,12 @@ void flash_device_id_10(bool display)
    * from the chip in autoselect mode
    * See the datasheet
    ******************************************/
-  flash_change_databus_direction(0); // Config as outputs
   
-  // Enter autoselect mode
-  flash_send_command(0x5555, 0xAA);
-  flash_send_command(0x2AAA, 0x55);
-  flash_send_command(0x5555, 0x90);
-  
-  flash_change_databus_direction(1); // Config as inputs
-  flash_addr_set(0x01); // Device ID
-  _delay_us(ACCESS_DELAY); // Give some time for address setup
-  flash_ctrl_rd();
-  _delay_us(ACCESS_DELAY); // Give some time for read access
-  uint8_t d = flash_data_get();
-  flash_ctrl_deselect();
-  _delay_us(ACCESS_DELAY); // Give some time for deselection
+  // Enter autoselect mode and read ID
+  flash_send(0x5555, 0xAA);
+  flash_send(0x2AAA, 0x55);
+  flash_send(0x5555, 0x90);
+  uint8_t d = flash_read(0x01); // Device ID
 
   dev_id = d; // Store device ID
   if (display) {
@@ -419,22 +495,12 @@ void flash_device_id_40()
    * See the datasheet
    ******************************************/
   
-  flash_change_databus_direction(0); // Config as outputs
-  
   // Enter autoselect mode
-  flash_send_command(0x555, 0xAA);
-  flash_send_command(0x2AA, 0x55);
-  flash_send_command(0x555, 0x90);
+  flash_send(0x555, 0xAA);
+  flash_send(0x2AA, 0x55);
+  flash_send(0x555, 0x90);
+	uint8_t d = flash_read(0x01); // Device ID
   
-  flash_change_databus_direction(1); // Config as inputs
-  flash_addr_set(0x01); // Device ID
-  _delay_us(ACCESS_DELAY); // Give some time for address setup
-  flash_ctrl_rd();
-  _delay_us(ACCESS_DELAY); // Give some time for read access
-  uint8_t d = flash_data_get();
-  flash_ctrl_deselect();
-  _delay_us(ACCESS_DELAY); // Give some time for deselection
-
   if (d < 0x10U) 
     Serial.print("0");
   Serial.print(d, HEX);
@@ -463,26 +529,15 @@ void flash_manufacturer_id_10()
    * See the datasheet
    ******************************************/
    
-  uint8_t data = 0x00U;
-  flash_change_databus_direction(0); // Config as outputs
-  
   // Enter autoselect mode for info
-  flash_send_command(0x5555, 0xAA);
-  flash_send_command(0x2AAA, 0x55);
-  flash_send_command(0x5555, 0x90);
+  flash_send(0x5555, 0xAA);
+  flash_send(0x2AAA, 0x55);
+  flash_send(0x5555, 0x90);
+	uint8_t d = flash_read(0x00); // Manufacturer ID
   
-  flash_change_databus_direction(1); // Config as inputs
-  flash_addr_set(0x00); // Manufacturer ID
-  _delay_us(ACCESS_DELAY); // Give some time for address setup
-  flash_ctrl_rd();
-  _delay_us(ACCESS_DELAY); // Give some time for read access
-  data = flash_data_get();
-  flash_ctrl_deselect();
-  _delay_us(ACCESS_DELAY); // Give some time for deselection
-
-  if (data < 0x10U) 
+  if (d < 0x10U) 
     Serial.print("0");
-  Serial.print(data, HEX);
+  Serial.print(d, HEX);
   Serial.flush();
   
   // Exit autoselect mode
@@ -496,26 +551,15 @@ void flash_manufacturer_id_40()
    * See the datasheet
    ******************************************/
    
-  uint8_t data = 0x00U;
-  flash_change_databus_direction(0); // Config as outputs
-  
   // Enter autoselect mode for info
-  flash_send_command(0x555, 0xAA);
-  flash_send_command(0x2AA, 0x55);
-  flash_send_command(0x555, 0x90);
+  flash_send(0x555, 0xAA);
+  flash_send(0x2AA, 0x55);
+  flash_send(0x555, 0x90);
   
-  flash_change_databus_direction(1); // Config as inputs
-  flash_addr_set(0x00); // Manufacturer ID
-  _delay_us(ACCESS_DELAY); // Give some time for address setup
-  flash_ctrl_rd();
-  _delay_us(ACCESS_DELAY); // Give some time for read access
-  data = flash_data_get();
-  flash_ctrl_deselect();
-  _delay_us(ACCESS_DELAY); // Give some time for deselection
-  
-  if (data < 0x10U) 
+	uint8_t d = flash_read(0x00); // Manufacturer ID  
+  if (d < 0x10U) 
     Serial.print("0");
-  Serial.print(data, HEX);
+  Serial.print(d, HEX);
   Serial.flush();
   
   // Exit autoselect mode
@@ -537,31 +581,22 @@ void flash_manufacturer_id()
 
 void flash_read_memory()
 {
-  uint32_t addr;
+  
   if (dev_id == -1)
     flash_device_id_10(false);
 
   // Determine maximum address to read
-  addr = (dev_id == D29F010 || dev_id == D27M1001 || dev_id == D27M1001_V2) ? 0x20000UL : 0x80000UL;
+  uint32_t max_addr = (dev_id == D29F010 || dev_id == D27M1001 || dev_id == D27M1001_V2) ? 0x20000UL : 0x80000UL;
     
   /* Read the chip until the address given */  
-  flash_change_databus_direction(1); // Config as inputs
-  
-  for (uint32_t i = 0UL; i < addr; i++)
+  for (uint32_t addr = 0UL; addr < max_addr; ++addr)
   {
-    flash_addr_set(i);
-    _delay_us(ACCESS_DELAY); // Give some time for address setup
-    flash_ctrl_rd();
-    _delay_us(ACCESS_DELAY); // Give some time for read access
-    uint8_t data = flash_data_get();
-    flash_ctrl_deselect();
-    _delay_us(ACCESS_DELAY); // Give some time for deselection
-    
-    if (data < 0x10U) 
-        Serial.print("0");
-    Serial.print(data, HEX);
-    Serial.flush();
+    uint8_t d = flash_read(addr);
+    if (d < 0x10U) 
+      Serial.print("0");
+    Serial.print(d, HEX);
   }
+  Serial.flush();	
 }
 
 /* This is the sequence to program a byte on the memory *
@@ -571,15 +606,13 @@ void flash_read_memory()
 
 boolean flash_program_byte_10(uint32_t addr, uint8_t data)
 {
-  flash_change_databus_direction(0); // Config as outputs
-  
   // Enter autoselect mode for program
-  flash_send_command(0x5555, 0xAA); 
-  flash_send_command(0x2AAA, 0x55);
-  flash_send_command(0x5555, 0xA0);
+  flash_send(0x5555, 0xAA); 
+  flash_send(0x2AAA, 0x55);
+  flash_send(0x5555, 0xA0);
  
   //Program Address & Program data
-  flash_send_command(addr, data);
+  flash_send(addr, data);
   
   /** Data Polling **/
   return flash_DQ7_byte_poll(addr, data);
@@ -587,15 +620,13 @@ boolean flash_program_byte_10(uint32_t addr, uint8_t data)
 
 boolean flash_program_byte_40(uint32_t addr, uint8_t data)
 {
-  flash_change_databus_direction(0); // Config as outputs
-  
   // Enter autoselect mode for program
-  flash_send_command(0x555, 0xAA); 
-  flash_send_command(0x2AA, 0x55);
-  flash_send_command(0x555, 0xA0);
+  flash_send(0x555, 0xAA); 
+  flash_send(0x2AA, 0x55);
+  flash_send(0x555, 0xA0);
   
-  //Program Address & Program data
-  flash_send_command(addr, data);
+  // Program Address & Program data
+  flash_send(addr, data);
   
   /** Data Polling **/
   return flash_DQ7_byte_poll(addr, data);
@@ -620,26 +651,20 @@ boolean flash_program_byte(uint32_t addr, uint8_t data)
 
 void flash_reset_chip_10()
 {
-  /* This is reset command for the AM29F010 */
-  flash_change_databus_direction(0); // Config as outputs
-  
   // Enter autoselect mode for chip reset
-  flash_send_command(0x5555, 0xAA);
-  flash_send_command(0x2AAA, 0x55);
-  flash_send_command(0x5555, 0xF0);
+  flash_send(0x5555, 0xAA);
+  flash_send(0x2AAA, 0x55);
+  flash_send(0x5555, 0xF0);
   
   _delay_ms(1000);
 }
 
 void flash_reset_chip_40()
 {
-  /* This is reset command for the AM29F010 */
-  flash_change_databus_direction(0); // Config as outputs
-  
   // Enter autoselect mode for chip reset
-  flash_send_command(0x555, 0xAA);
-  flash_send_command(0x2AA, 0x55);
-  flash_send_command(0x555, 0xF0);
+  flash_send(0x555, 0xAA);
+  flash_send(0x2AA, 0x55);
+  flash_send(0x555, 0xF0);
    
   _delay_ms(1000);
 }
@@ -664,18 +689,15 @@ void flash_reset_chip()
 
 void flash_erase_memory_10()
 {
-  boolean ret = true;
-  flash_change_databus_direction(0); // Config as outputs
-  
   // Enter autoselect mode for chip erase
-  flash_send_command(0x5555, 0xAA);
-  flash_send_command(0x2AAA, 0x55);
-  flash_send_command(0x5555, 0x80);
-  flash_send_command(0x5555, 0xAA);
-  flash_send_command(0x2AAA, 0x55);
-  flash_send_command(0x5555, 0x10);
+  flash_send(0x5555, 0xAA);
+  flash_send(0x2AAA, 0x55);
+  flash_send(0x5555, 0x80);
+  flash_send(0x5555, 0xAA);
+  flash_send(0x2AAA, 0x55);
+  flash_send(0x5555, 0x10);
  
-  ret = flash_DQ7_erase_poll();
+  boolean ret = flash_DQ7_erase_poll();
   flash_reset_chip();
   
   // Send status to python
@@ -691,18 +713,15 @@ void flash_erase_memory_10()
 
 void flash_erase_memory_40()
 {
-  boolean ret = true;
-  flash_change_databus_direction(0); // Config as outputs
-  
   // Enter autoselect mode for chip erase
-  flash_send_command(0x555, 0xAA);
-  flash_send_command(0x2AA, 0x55);
-  flash_send_command(0x555, 0x80);
-  flash_send_command(0x555, 0xAA);
-  flash_send_command(0x2AA, 0x55);
-  flash_send_command(0x555, 0x10);
+  flash_send(0x555, 0xAA);
+  flash_send(0x2AA, 0x55);
+  flash_send(0x555, 0x80);
+  flash_send(0x555, 0xAA);
+  flash_send(0x2AA, 0x55);
+  flash_send(0x555, 0x10);
   
-  ret = flash_DQ7_erase_poll();
+  boolean ret = flash_DQ7_erase_poll();
   flash_reset_chip();
   
   // Send status to python
@@ -730,52 +749,49 @@ void flash_erase_memory()
 
 void flash_program_memory()
 {
-    
-    flash_change_databus_direction(0); // Config as outputs
-    
-    // Ack the Write command
-    Serial.print("+");
-    Serial.flush();
-    
-    int index = 0;
-    char tab[10] = {0};
-    
-    while (1) {
-      // Wait for a character
-      while (!Serial.available());
-      
-      char car = Serial.read();
-      if (car == '\r')
-          break;
-      
-      tab[index++]=car;
-    }
-    tab[index] = '\0';
-    
-    Serial.print("+");
-    Serial.flush();
-    
-    uint32_t maxaddr = (uint32_t)atol(tab);
-    uint32_t address = 0;	
-    while(address < maxaddr) {
+	// Ack the Write command
+	Serial.print("+");
+	Serial.flush();
+	
+	int index = 0;
+	char tab[10] = {0};
+	
+	while (1) {
+		// Wait for a character
+		while (!Serial.available());
 		
-      // Wait for a character
-      while (!Serial.available());
-      uint8_t data = Serial.read();
-	  
-	  // Try to program byte
-      if (!flash_program_byte(address, data)) {
-		Serial.print("-"); 
+		char car = Serial.read();
+		if (car == '\r')
+				break;
+		
+		tab[index++]=car;
+	}
+	tab[index] = '\0';
+	
+	Serial.print("+");
+	Serial.flush();
+	
+	uint32_t maxaddr = (uint32_t)atol(tab);
+	uint32_t address = 0;	
+	while(address < maxaddr) {
+	
+		// Wait for a character
+		while (!Serial.available());
+		uint8_t data = Serial.read();
+	
+		// Try to program byte
+		if (!flash_program_byte(address, data)) {
+			Serial.print("-"); 
+			Serial.flush();
+			break;
+		}
+	
+		// Ack received byte
+		Serial.print("+"); 
 		Serial.flush();
-		break;
-	  }
-	  
-      // Ack received byte
-      Serial.print("+"); 
-      Serial.flush();
-	  
-	  ++address;
-    }
+	
+		++address;
+	}
 	
 	// Exit programming mode
 	flash_reset_chip();
@@ -787,24 +803,16 @@ void flash_check_sector_protection_10()
   uint8_t prot = 0;
   
   do {
-	flash_change_databus_direction(0); // Config as outputs
-	
-	// Enter autoselect mode for info
-	flash_send_command(0x5555, 0xAA);
-	flash_send_command(0x2AAA, 0x55);
-	flash_send_command(0x5555, 0x90);
+		// Enter autoselect mode for info
+		flash_send(0x5555, 0xAA);
+		flash_send(0x2AAA, 0x55);
+		flash_send(0x5555, 0x90);
 
-	// Read sector protection  
-	flash_change_databus_direction(1); // Config as inputs
-	flash_addr_set(0x02UL | (((uint32_t)sector) << 16UL)); // Sector Protection verification
-	_delay_us(ACCESS_DELAY); // Give some time for address setup
-	flash_ctrl_rd();
-	_delay_us(ACCESS_DELAY); // Give some time for read access
-	prot |= (flash_data_get() & 1U) << sector; // 1 means protected
-	flash_ctrl_deselect();
-	_delay_us(ACCESS_DELAY); // Give some time for deselection
-	
-	++sector;
+		// Read sector protection  
+		prot |= (
+			flash_read(0x02UL | (((uint32_t)sector) << 16UL)) // Sector Protection verification
+				& 1U) << sector; // 1 means protected
+		++sector;
   } while (sector < 2);
 
   if (prot < 0x10U) 
@@ -822,24 +830,18 @@ void flash_check_sector_protection_40()
   uint8_t prot = 0;
   
   do {
-	flash_change_databus_direction(0); // Config as outputs
-	
-	// Enter autoselect mode for info
-	flash_send_command(0x555, 0xAA);
-	flash_send_command(0x2AA, 0x55);
-	flash_send_command(0x555, 0x90);
+		
+		// Enter autoselect mode for info
+		flash_send(0x555, 0xAA);
+		flash_send(0x2AA, 0x55);
+		flash_send(0x555, 0x90);
 
-	// Read sector protection  
-	flash_change_databus_direction(1); // Config as inputs
-	flash_addr_set(0x02UL | (((uint32_t)sector) << 16UL)); // Sector Protection verification
-	_delay_us(ACCESS_DELAY); // Give some time for address setup
-	flash_ctrl_rd();
-	_delay_us(ACCESS_DELAY); // Give some time for read access
-	prot |= (flash_data_get() & 1U) << sector; // 1 means protected
-	flash_ctrl_deselect();
-	_delay_us(ACCESS_DELAY); // Give some time for deselection
-	
-	++sector;
+		// Read sector protection  
+		prot |= (
+			flash_read(0x02UL | (((uint32_t)sector) << 16UL)) // Sector Protection verification
+				& 1U) << sector; // 1 means protected
+		
+		++sector;
   } while (sector < 8);
 
   if (prot < 0x10U) 
@@ -855,13 +857,13 @@ void flash_check_sector_protection_40()
 void flash_check_sector_protection()
 {
 	if (dev_id == -1)
-        flash_device_id_10(false);
+    flash_device_id_10(false);
     
-    if (dev_id == D29F010 || dev_id == D27M1001 || dev_id == D27M1001_V2) {
-        flash_check_sector_protection_10();
-    } else {
-        flash_check_sector_protection_40();
-    }
+	if (dev_id == D29F010 || dev_id == D27M1001 || dev_id == D27M1001_V2) {
+			flash_check_sector_protection_10();
+	} else {
+			flash_check_sector_protection_40();
+	}
 }
 
 boolean flash_all_sectors_protect_10()
@@ -874,23 +876,28 @@ boolean flash_all_sectors_protect_10()
 		uint8_t data1 = 0, data0 = 0;
 		do {
 
-			flash_change_databus_direction(0); // Config as outputs
+			flash_enable_oe_12v(false);
+			flash_enable_a9_12v(false);
 			
 			// Unlock for sector protect/unprotect
-			flash_send_command(0x5555, 0xAA);
-			flash_send_command(0x2AAA, 0x55);
-			flash_send_command(0x5555, 0x80);
-			flash_send_command(0x5555, 0xAA);
-			flash_send_command(0x2AAA, 0x55);
-			flash_send_command(0x5555, 0x20);
+			flash_send(0x5555, 0xAA);
+			flash_send(0x2AAA, 0x55);
+			flash_send(0x5555, 0x80);
+			flash_send(0x5555, 0xAA);
+			flash_send(0x2AAA, 0x55);
+			flash_send(0x5555, 0x20);
 
 			// Setup sector address, A9=1, A6=0 (protect), A1=1
 			flash_addr_set( 0x201UL | (((uint32_t)sector) << 16UL)); 
 			flash_data_set( 0 );
 
+			flash_enable_oe_12v(true);
+			flash_enable_a9_12v(true);
+
 			// OE = 1, CE = 0
 			digitalWrite(OE_PIN, HIGH);  //OE
 			digitalWrite(CE_PIN, LOW);  //CE
+			_delay_us(ACCESS_DELAY); 
 		  
 			// Activate WE 
 			digitalWrite(WE_PIN, LOW);  //WE
@@ -903,6 +910,9 @@ boolean flash_all_sectors_protect_10()
 
 			// Toggle bit polling
 			flash_change_databus_direction(1); // Config as inputs
+
+			// Disable 12 on OE
+			flash_enable_oe_12v(false);
 
 			// Read first time
 			digitalWrite(OE_PIN, LOW);  //OE
@@ -920,12 +930,49 @@ boolean flash_all_sectors_protect_10()
 				data0 = flash_data_get();
 				digitalWrite(OE_PIN, HIGH);  //OE
 				_delay_us(ACCESS_DELAY); 
-			} while (((data1 ^ data0) & 0x40) != 0 && --tout != 0);// Q6 is toggling
+			} while (
+				((data1 ^ data0) & 0x40) != 0 && /* Q6 Toggling means still busy */
+				(data0 & 0x20) == 0 && /* Q5 = 0 => But not timedout yet*/
+				--tout != 0 /* And internal timeout loop not expired */
+			);
 			
-			// If timeout, or Q5 = 1 (means timeout)
-			if (!tout || (data0 & 0x20) != 0) {
+			// If timeout, do not bother...
+			if (tout == 0) {
+				
+				// Failure
 				tries = 0;
 				break;
+				
+			} else {
+				
+				// If still toggling...
+				if (((data1 ^ data0) & 0x40) != 0) {
+				
+					/* If chip signals timeout ... */
+					if ((data0 & 0x20) != 0) {
+						/* Read twice */
+
+						// Read first time
+						digitalWrite(OE_PIN, LOW);  //OE
+						_delay_us(ACCESS_DELAY); // Give some time for read access
+						data1 = flash_data_get();
+						digitalWrite(OE_PIN, HIGH);  //OE
+						_delay_us(ACCESS_DELAY); 
+
+						// Read second time
+						digitalWrite(OE_PIN, LOW);  //OE
+						_delay_us(ACCESS_DELAY); // Give some time for read access
+						data0 = flash_data_get();
+						digitalWrite(OE_PIN, HIGH);  //OE
+						_delay_us(ACCESS_DELAY); 
+
+						// If still toggling, operation failed
+						if (((data1 ^ data0) & 0x40) != 0) {
+							tries = 0;
+							break;
+						}
+					} /* otherwise, success */
+				} /* else success */
 			}
 			
 			// CE = 1 , A9=1
@@ -941,6 +988,9 @@ boolean flash_all_sectors_protect_10()
 		}
 		++sector;
 	} while (sector < 2);
+	
+	// Just in case
+	flash_enable_a9_12v(false);
 	
 	// Exit programming mode
 	flash_reset_chip();
@@ -958,23 +1008,28 @@ boolean flash_all_sectors_protect_40()
 		uint8_t tries = 32;
 		uint8_t data1 = 0, data0 = 0;
 		do {
-			flash_change_databus_direction(0); // Config as outputs
+			flash_enable_oe_12v(false);
+			flash_enable_a9_12v(false);
 			
 			// Unlock for sector protect/unprotect
-			flash_send_command(0x555, 0xAA);
-			flash_send_command(0x2AA, 0x55);
-			flash_send_command(0x555, 0x80);
-			flash_send_command(0x555, 0xAA);
-			flash_send_command(0x2AA, 0x55);
-			flash_send_command(0x555, 0x20);
+			flash_send(0x555, 0xAA);
+			flash_send(0x2AA, 0x55);
+			flash_send(0x555, 0x80);
+			flash_send(0x555, 0xAA);
+			flash_send(0x2AA, 0x55);
+			flash_send(0x555, 0x20);
 			
 			// Setup sector address, A9=1, A6=0 (protect), A1=1
 			flash_addr_set( 0x201UL | (((uint32_t)sector) << 16UL)); 
 			flash_data_set( 0 );
 
+			flash_enable_oe_12v(true);
+			flash_enable_a9_12v(true);
+
 			// OE = 1, CE = 0
 			digitalWrite(OE_PIN, HIGH);  //OE
 			digitalWrite(CE_PIN, LOW);  //CE
+			_delay_us(ACCESS_DELAY); 
 		  
 			// Activate WE 
 			digitalWrite(WE_PIN, LOW);  //WE
@@ -987,6 +1042,9 @@ boolean flash_all_sectors_protect_40()
 
 			// Toggle bit polling
 			flash_change_databus_direction(1); // Config as inputs
+
+			// Disable 12 on OE
+			flash_enable_oe_12v(false);
 
 			// Read first time
 			digitalWrite(OE_PIN, LOW);  //OE
@@ -1004,12 +1062,49 @@ boolean flash_all_sectors_protect_40()
 				data0 = flash_data_get();
 				digitalWrite(OE_PIN, HIGH);  //OE
 				_delay_us(ACCESS_DELAY); 
-			} while (((data1 ^ data0) & 0x40) != 0 && --tout != 0);// Q6 is toggling
+			} while (
+				((data1 ^ data0) & 0x40) != 0 && /* Q6 Toggling means still busy */
+				(data0 & 0x20) == 0 && /* Q5 = 0 => But not timedout yet*/
+				--tout != 0 /* And internal timeout loop not expired */
+			);
 			
-			// If timeout, or Q5 = 1 (means timeout)
-			if (!tout || (data0 & 0x20) != 0) {
+			// If timeout, do not bother...
+			if (tout == 0) {
+				
+				// Failure
 				tries = 0;
 				break;
+				
+			} else {
+				
+				// If still toggling...
+				if (((data1 ^ data0) & 0x40) != 0) {
+				
+					/* If chip signals timeout ... */
+					if ((data0 & 0x20) != 0) {
+						/* Read twice */
+
+						// Read first time
+						digitalWrite(OE_PIN, LOW);  //OE
+						_delay_us(ACCESS_DELAY); // Give some time for read access
+						data1 = flash_data_get();
+						digitalWrite(OE_PIN, HIGH);  //OE
+						_delay_us(ACCESS_DELAY); 
+
+						// Read second time
+						digitalWrite(OE_PIN, LOW);  //OE
+						_delay_us(ACCESS_DELAY); // Give some time for read access
+						data0 = flash_data_get();
+						digitalWrite(OE_PIN, HIGH);  //OE
+						_delay_us(ACCESS_DELAY); 
+
+						// If still toggling, operation failed
+						if (((data1 ^ data0) & 0x40) != 0) {
+							tries = 0;
+							break;
+						}
+					} /* otherwise, success */
+				} /* else success */
 			}
 			
 			// CE = 1 , A9=1
@@ -1025,6 +1120,9 @@ boolean flash_all_sectors_protect_40()
 		}
 		++sector;
 	} while (sector < 8);
+	
+	// Just in case
+	flash_enable_a9_12v(false);
 	
 	// Exit programming mode
 	flash_reset_chip();
@@ -1055,23 +1153,28 @@ boolean flash_all_sectors_unprotect_10()
 		uint8_t data1 = 0, data0 = 0;
 		do {
 	
-			flash_change_databus_direction(0); // Config as outputs
+			flash_enable_oe_12v(false);
+			flash_enable_a9_12v(false);
 			
 			// Unlock for sector protect/unprotect
-			flash_send_command(0x5555, 0xAA);
-			flash_send_command(0x2AAA, 0x55);
-			flash_send_command(0x5555, 0x80);
-			flash_send_command(0x5555, 0xAA);
-			flash_send_command(0x2AAA, 0x55);
-			flash_send_command(0x5555, 0x20);
+			flash_send(0x5555, 0xAA);
+			flash_send(0x2AAA, 0x55);
+			flash_send(0x5555, 0x80);
+			flash_send(0x5555, 0xAA);
+			flash_send(0x2AAA, 0x55);
+			flash_send(0x5555, 0x20);
 
 			// Setup sector address, A9=1, A6=1 (unprotect), A1=1
 			flash_addr_set( 0x241UL | (((uint32_t)sector) << 16UL)); 
 			flash_data_set( 0 );
 
+			flash_enable_oe_12v(true);
+			flash_enable_a9_12v(true);
+
 			// OE = 1, CE = 0
 			digitalWrite(OE_PIN, HIGH);  //OE
 			digitalWrite(CE_PIN, LOW);  //CE
+			_delay_us(ACCESS_DELAY); 
 		  
 			// Activate WE 
 			digitalWrite(WE_PIN, LOW);  //WE
@@ -1084,6 +1187,9 @@ boolean flash_all_sectors_unprotect_10()
 
 			// Toggle bit polling
 			flash_change_databus_direction(1); // Config as inputs
+
+			// Disable 12 on OE
+			flash_enable_oe_12v(false);
 
 			// Read first time
 			digitalWrite(OE_PIN, LOW);  //OE
@@ -1101,14 +1207,51 @@ boolean flash_all_sectors_unprotect_10()
 				data0 = flash_data_get();
 				digitalWrite(OE_PIN, HIGH);  //OE
 				_delay_us(ACCESS_DELAY); 
-			} while (((data1 ^ data0) & 0x40) != 0 && --tout != 0);// Q6 is toggling
+			} while (
+				((data1 ^ data0) & 0x40) != 0 && /* Q6 Toggling means still busy */
+				(data0 & 0x20) == 0 && /* Q5 = 0 => But not timedout yet*/
+				--tout != 0 /* And internal timeout loop not expired */
+			);
 			
-			// If timeout, or Q5 = 1 (means timeout)
-			if (!tout || (data0 & 0x20) != 0) {
+			// If timeout, do not bother...
+			if (tout == 0) {
+				
+				// Failure
 				tries = 0;
 				break;
+				
+			} else {
+				
+				// If still toggling...
+				if (((data1 ^ data0) & 0x40) != 0) {
+				
+					/* If chip signals timeout ... */
+					if ((data0 & 0x20) != 0) {
+						/* Read twice */
+
+						// Read first time
+						digitalWrite(OE_PIN, LOW);  //OE
+						_delay_us(ACCESS_DELAY); // Give some time for read access
+						data1 = flash_data_get();
+						digitalWrite(OE_PIN, HIGH);  //OE
+						_delay_us(ACCESS_DELAY); 
+
+						// Read second time
+						digitalWrite(OE_PIN, LOW);  //OE
+						_delay_us(ACCESS_DELAY); // Give some time for read access
+						data0 = flash_data_get();
+						digitalWrite(OE_PIN, HIGH);  //OE
+						_delay_us(ACCESS_DELAY); 
+
+						// If still toggling, operation failed
+						if (((data1 ^ data0) & 0x40) != 0) {
+							tries = 0;
+							break;
+						}
+					} /* otherwise, success */
+				} /* else success */
 			}
-			
+
 			// CE = 1 , A9=1
 			digitalWrite(CE_PIN, HIGH);  //CE
 			_delay_us(ACCESS_DELAY); 
@@ -1123,6 +1266,9 @@ boolean flash_all_sectors_unprotect_10()
 		++sector;
 	} while (sector < 2);
 	
+	// Just in case
+	flash_enable_a9_12v(false);
+
 	// Exit programming mode
 	flash_reset_chip();
 	
@@ -1140,19 +1286,23 @@ boolean flash_all_sectors_unprotect_40()
 		uint8_t data1 = 0, data0 = 0;
 		do {
 	
-			flash_change_databus_direction(0); // Config as outputs
+			flash_enable_oe_12v(false);
+			flash_enable_a9_12v(false);
 			
 			// Unlock for sector protect/unprotect
-			flash_send_command(0x555, 0xAA);
-			flash_send_command(0x2AA, 0x55);
-			flash_send_command(0x555, 0x80);
-			flash_send_command(0x555, 0xAA);
-			flash_send_command(0x2AA, 0x55);
-			flash_send_command(0x555, 0x20);
+			flash_send(0x555, 0xAA);
+			flash_send(0x2AA, 0x55);
+			flash_send(0x555, 0x80);
+			flash_send(0x555, 0xAA);
+			flash_send(0x2AA, 0x55);
+			flash_send(0x555, 0x20);
 
 			// Setup sector address, A9=1, A6=1 (unprotect), A1=1
 			flash_addr_set( 0x241UL | (((uint32_t)sector) << 16UL)); 
 			flash_data_set( 0 );
+
+			flash_enable_oe_12v(true);
+			flash_enable_a9_12v(true);
 
 			// OE = 1, CE = 0
 			digitalWrite(OE_PIN, HIGH);  //OE
@@ -1160,6 +1310,7 @@ boolean flash_all_sectors_unprotect_40()
 		  
 			// Activate WE 
 			digitalWrite(WE_PIN, LOW);  //WE
+			_delay_us(ACCESS_DELAY); 
 			
 			// Programming time: 12ms for unprotect
 			_delay_ms(12);
@@ -1169,6 +1320,9 @@ boolean flash_all_sectors_unprotect_40()
 
 			// Toggle bit polling
 			flash_change_databus_direction(1); // Config as inputs
+
+			// Disable 12 on OE
+			flash_enable_oe_12v(false);
 
 			// Read first time
 			digitalWrite(OE_PIN, LOW);  //OE
@@ -1186,12 +1340,49 @@ boolean flash_all_sectors_unprotect_40()
 				data0 = flash_data_get();
 				digitalWrite(OE_PIN, HIGH);  //OE
 				_delay_us(ACCESS_DELAY); 
-			} while (((data1 ^ data0) & 0x40) != 0 && --tout != 0);// Q6 is toggling
+			} while (
+				((data1 ^ data0) & 0x40) != 0 && /* Q6 Toggling means still busy */
+				(data0 & 0x20) == 0 && /* Q5 = 0 => But not timedout yet*/
+				--tout != 0 /* And internal timeout loop not expired */
+			);
 			
-			// If timeout, or Q5 = 1 (means timeout)
-			if (!tout || (data0 & 0x20) != 0) {
+			// If timeout, do not bother...
+			if (tout == 0) {
+				
+				// Failure
 				tries = 0;
 				break;
+				
+			} else {
+				
+				// If still toggling...
+				if (((data1 ^ data0) & 0x40) != 0) {
+				
+					/* If chip signals timeout ... */
+					if ((data0 & 0x20) != 0) {
+						/* Read twice */
+
+						// Read first time
+						digitalWrite(OE_PIN, LOW);  //OE
+						_delay_us(ACCESS_DELAY); // Give some time for read access
+						data1 = flash_data_get();
+						digitalWrite(OE_PIN, HIGH);  //OE
+						_delay_us(ACCESS_DELAY); 
+
+						// Read second time
+						digitalWrite(OE_PIN, LOW);  //OE
+						_delay_us(ACCESS_DELAY); // Give some time for read access
+						data0 = flash_data_get();
+						digitalWrite(OE_PIN, HIGH);  //OE
+						_delay_us(ACCESS_DELAY); 
+
+						// If still toggling, operation failed
+						if (((data1 ^ data0) & 0x40) != 0) {
+							tries = 0;
+							break;
+						}
+					} /* otherwise, success */
+				} /* else success */
 			}
 			
 			// CE = 1 , A9=1
@@ -1207,7 +1398,10 @@ boolean flash_all_sectors_unprotect_40()
 		}
 		++sector;
 	} while (sector < 8);
-	
+
+	// Just in case
+	flash_enable_a9_12v(false);
+
 	// Exit programming mode
 	flash_reset_chip();
 	
@@ -1423,6 +1617,9 @@ void setup()
   pinMode(WE_PIN, OUTPUT);
   pinMode(OE_PIN, OUTPUT);
 
+	flash_enable_oe_12v(false);
+	flash_enable_a9_12v(false);
+	
   digitalWrite(CE_PIN, HIGH);
   digitalWrite(WE_PIN, HIGH);
   digitalWrite(OE_PIN, HIGH);
