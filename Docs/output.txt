@@ -1,0 +1,45 @@
+Beginning test.....
+
+AMD Flash found in socket...
+Polling part for Device ID...found an Am29LV800B
+Checking current flash status...flash is [Ready]
+Performing API tests...
+
+Erasing sector 8...done.
+Verifying erase...................erase successful.
+Writing a single word [0xABCD]
+After write(0xABCD): abcd
+Erasing sector 9...done.
+Writing 32 kbyte string...done.
+
+Testing erase suspend
+Beginning erase...
+Suspending erase...done.
+Checking current flash status...flash is [Erase Suspended]
+Resuming erase after status check..done.
+Entering unlock bypass mode...
+Programming a string in unlock bypass mode..done.
+Exiting unlock bypass mode..
+
+Verifying sector protection...
+This device contains 19 sectors: 
+Verify sector # 0, size [16384]: sector is not protected[ 0].
+Verify sector # 1, size [8192 ]: sector is not protected[ 0].
+Verify sector # 2, size [8192 ]: sector is not protected[ 0].
+Verify sector # 3, size [32768]: sector is not protected[ 0].
+Verify sector # 4, size [65536]: sector is not protected[ 0].
+Verify sector # 5, size [65536]: sector is not protected[ 0].
+Verify sector # 6, size [65536]: sector is not protected[ 0].
+Verify sector # 7, size [65536]: sector is not protected[ 0].
+Verify sector # 8, size [65536]: sector is not protected[ 0].
+Verify sector # 9, size [65536]: sector is not protected[ 0].
+Verify sector #10, size [65536]: sector is not protected[ 0].
+Verify sector #11, size [65536]: sector is not protected[ 0].
+Verify sector #12, size [65536]: sector is not protected[ 0].
+Verify sector #13, size [65536]: sector is not protected[ 0].
+Verify sector #14, size [65536]: sector is not protected[ 0].
+Verify sector #15, size [65536]: sector is not protected[ 0].
+Verify sector #16, size [65536]: sector is not protected[ 0].
+Verify sector #17, size [65536]: sector is not protected[ 0].
+Verify sector #18, size [65536]: sector is not protected[ 0].
+Test drive done!

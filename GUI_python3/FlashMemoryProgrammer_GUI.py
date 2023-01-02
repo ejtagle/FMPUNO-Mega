@@ -66,6 +66,8 @@ class programmer_gui(wx.Frame):
         edititem1 = editmenu.Append(wx.NewIdRef(), '&Read', '')
         edititem2 = editmenu.Append(wx.NewIdRef(), '&Erase', '')
         edititem3 = editmenu.Append(wx.NewIdRef(), '&Program', '')
+        edititem4 = editmenu.Append(wx.NewIdRef(), 'Pr&otect', '')
+        edititem5 = editmenu.Append(wx.NewIdRef(), '&Unprotect', '')
 
         menubar.Append(filemenu, 'File')
         menubar.Append(editmenu, 'Edit')
@@ -77,6 +79,8 @@ class programmer_gui(wx.Frame):
         self.Bind(wx.EVT_MENU, self.OnRead, edititem1)
         self.Bind(wx.EVT_MENU, self.OnErase, edititem2)
         self.Bind(wx.EVT_MENU, self.OnProgram, edititem3)
+        self.Bind(wx.EVT_MENU, self.OnProtect, edititem4)
+        self.Bind(wx.EVT_MENU, self.OnUnprotect, edititem5)
 
         # End menubar
 
@@ -94,10 +98,12 @@ class programmer_gui(wx.Frame):
         label6 = wx.StaticText(panel, -1, 'IC Operations:', (10, 200), size=(200, -1))
         label6.SetFont(font3)
 
-        self.buttonProgram = wx.Button(panel, id=-1, label='Upload', pos=(50, 240), size=(65, 40))
-        self.buttonRead = wx.Button(panel, id=-1, label='Read',  pos=(50 + 65, 240), size=(65, 40))
-        self.buttonErase = wx.Button(panel, id=-1, label='Erase',pos=(50, 280), size=(65, 40))
-        self.buttonInfo = wx.Button(panel, id=-1, label='Infos', pos=(50 + 65, 280), size=(65, 40))
+        self.buttonProgram = wx.Button(panel, id=-1, label='Upload', pos=(20, 240), size=(65, 40))
+        self.buttonRead = wx.Button(panel, id=-1, label='Read',  pos=(20 + 65, 240), size=(65, 40))
+        self.buttonErase = wx.Button(panel, id=-1, label='Erase',pos=(20, 280), size=(65, 40))
+        self.buttonInfo = wx.Button(panel, id=-1, label='Infos', pos=(20 + 65, 280), size=(65, 40))
+        self.buttonProtect = wx.Button(panel, id=-1, label='Protect', pos=(20+ 65 + 65, 240), size=(65, 40))
+        self.buttonUnprotect = wx.Button(panel, id=-1, label='Unprotect',pos=(20+ 65 + 65, 280), size=(65, 40))
 
         self.textarea = wx.TextCtrl(panel, pos=(240, 10), style=wx.TE_MULTILINE | wx.TE_READONLY, size=(450, 265))
 
@@ -105,7 +111,7 @@ class programmer_gui(wx.Frame):
         label1 = wx.StaticText(panel, -1, 'File to Upload', (10, 10), size=(200, -1))
         label1.SetFont(font1)
 
-        label4 = wx.StaticText(panel, -1, 'Game File: ', (10, 40))
+        label4 = wx.StaticText(panel, -1, 'ROM File: ', (10, 40))
         self.uploadText = wx.TextCtrl(panel, -1, pos=(85, 40), size=(100, -1), style=wx.TE_READONLY)
         buttonDlg = wx.Button(panel, id=-1, label='...', pos=(185,40), size=(40, 30))
 
@@ -165,6 +171,8 @@ class programmer_gui(wx.Frame):
         self.Bind(wx.EVT_BUTTON, self.OnRead, self.buttonRead)
         self.Bind(wx.EVT_BUTTON, self.OnErase, self.buttonErase)
         self.Bind(wx.EVT_BUTTON, self.OnInfos, self.buttonInfo)
+        self.Bind(wx.EVT_BUTTON, self.OnProtect, self.buttonProtect)
+        self.Bind(wx.EVT_BUTTON, self.OnUnprotect, self.buttonUnprotect)
         self.Bind(wx.EVT_CLOSE, self.OnExit)
 
         self.intro = \
@@ -315,7 +323,7 @@ class programmer_gui(wx.Frame):
                 temp = arduino.readline()           # check for serial output.
                 if not not temp.decode():       # if temp is not empty.
                     val = (val.decode()+temp.decode()).encode()
-                    # requrired to decode, sum, then encode because
+                    # required to decode, sum, then encode because
                     # long values might require multiple passes
             val = val.decode()                  # decoding from bytes
             val = val.strip()                   # stripping leading and trailing spaces.
@@ -396,6 +404,134 @@ class programmer_gui(wx.Frame):
             self.SetStatusText('Erasing, Please wait ...')
 
             command = "E"
+            arduino.write(command.encode())
+            response = ''
+            time.sleep(.001)                    # delay of 1ms
+            val = arduino.readline()                # read complete line from serial output
+        
+            while not '\\n'in str(val):  
+                time.sleep(.001)                # delay of 1ms 
+                temp = arduino.readline()           # check for serial output.
+                if not not temp.decode():       # if temp is not empty.
+                    val = (val.decode()+temp.decode()).encode()
+                    # requrired to decode, sum, then encode because
+                    # long values might require multiple passes
+            val = val.decode()                  # decoding from bytes
+            val = val.strip()                   # stripping leading and trailing spaces.
+
+            response = val
+            self.SetStatusText('Operation Completed Successfully.')
+            dlg = wx.MessageDialog(self, 'Flash memory %s' % response, 'IC Erase', wx.OK)
+            dlg.ShowModal()
+            dlg.Destroy()
+
+            arduino.close()
+            
+        else:
+            dlg = wx.MessageDialog(self, "Can't communicate with Arduino, please check the fields" , 'Incorrect values', wx.OK)
+            dlg.ShowModal()
+            dlg.Destroy()
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+    def OnProtect(self, event):
+        counter = 0
+        port = str(self.serialBox.GetValue())
+        baudrate = str(self.baudBox.GetValue())
+        print(port,baudrate)
+
+        if str(self.serialBox.GetValue()) != '' and baudrate != '':
+
+            # self.textarea.SetValue('')
+
+            port = str(self.serialBox.GetValue())
+            baudrate = str(self.baudBox.GetValue())
+            print(port,baudrate)
+
+            # serial = 0
+
+            percent = 0
+
+            try:
+                arduino = serial.Serial(port, int(float(baudrate)),
+                        timeout=30)
+            except:
+                dlg = wx.MessageDialog(self,
+                        "Can't communicate with Arduino, please check serial ports"
+                        , 'Communication Problem', wx.OK)
+                dlg.ShowModal()
+                dlg.Destroy()
+                return
+
+            time.sleep(2)
+
+            self.SetStatusText('Protecting Sectors, Please wait ...')
+
+            command = "L"
+            arduino.write(command.encode())
+            response = ''
+            time.sleep(.001)                    # delay of 1ms
+            val = arduino.readline()                # read complete line from serial output
+        
+            while not '\\n'in str(val):  
+                time.sleep(.001)                # delay of 1ms 
+                temp = arduino.readline()           # check for serial output.
+                if not not temp.decode():       # if temp is not empty.
+                    val = (val.decode()+temp.decode()).encode()
+                    # requrired to decode, sum, then encode because
+                    # long values might require multiple passes
+            val = val.decode()                  # decoding from bytes
+            val = val.strip()                   # stripping leading and trailing spaces.
+
+            response = val
+            self.SetStatusText('Operation Completed Successfully.')
+            dlg = wx.MessageDialog(self, 'Flash memory %s' % response, 'IC Erase', wx.OK)
+            dlg.ShowModal()
+            dlg.Destroy()
+
+            arduino.close()
+            
+        else:
+            dlg = wx.MessageDialog(self, "Can't communicate with Arduino, please check the fields" , 'Incorrect values', wx.OK)
+            dlg.ShowModal()
+            dlg.Destroy()
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+    def OnUnprotect(self, event):
+        counter = 0
+        port = str(self.serialBox.GetValue())
+        baudrate = str(self.baudBox.GetValue())
+        print(port,baudrate)
+
+        if str(self.serialBox.GetValue()) != '' and baudrate != '':
+
+            # self.textarea.SetValue('')
+
+            port = str(self.serialBox.GetValue())
+            baudrate = str(self.baudBox.GetValue())
+            print(port,baudrate)
+
+            # serial = 0
+
+            percent = 0
+
+            try:
+                arduino = serial.Serial(port, int(float(baudrate)),
+                        timeout=30)
+            except:
+                dlg = wx.MessageDialog(self,
+                        "Can't communicate with Arduino, please check serial ports"
+                        , 'Communication Problem', wx.OK)
+                dlg.ShowModal()
+                dlg.Destroy()
+                return
+
+            time.sleep(2)
+
+            self.SetStatusText('Unprotecting sectors, Please wait ...')
+
+            command = "U"
             arduino.write(command.encode())
             response = ''
             time.sleep(.001)                    # delay of 1ms

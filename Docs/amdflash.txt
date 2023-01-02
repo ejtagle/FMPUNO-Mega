@@ -1,0 +1,1396 @@
+
+
+
+
+
+
+
+ 
+
+Advanced Micro Devices
+
+
+
+
+
+Embedded Flash Source Code
+
+
+
+Software Design Guide
+
+
+
+Introduction
+
+
+Advanced Micro Devices, headquartered in Sunnyvale, California, was founded in 1969.  AMD is 
+now the fifth largest U.S.-based manufacturer of integrated circuits, employing over 11,000 
+people worldwide. The company is committed to providing manufacturers of equipment for 
+personal and networked computation and communication with state-of-the-art ICs that reduce 
+their costs and design time and improve the performance of their products. AMD specialties 
+include microprocessors and related peripherals, non-volatile memories, programmable logic 
+devices, and networking devices. 
+
+
+AMD's Flash Devices
+
+Non-volatile memories have the ability to retain data without power to the devices. Flash 
+memory provides a tremendous advantage over traditional non-volatile memories. Unlike 
+EPROMs, Flash devices can be programmed in-system. Flash devices are also less expensive 
+than E2PROMs to manufacture. AMD was one of the first companies to manufacture first 
+generation 12.0V Flash devices. The company is now second in worldwide Flash shipments and 
+its market share is still growing.
+
+AMD provides densities from 256Kbits to 16Mbits in Flash devices, as well as 12.0V and 5.0V 
+programming. The Am29F010 with AMD's proprietary negative gate erase technology was the 
+first in the 5.0V-only family and conforms to all JEDEC standards. 
+
+
+
+
+
+
+
+
+Flash offerings from AMD include the following devices:
+
+Density(bits)		     12V			      5V			Bus Options
+
+256K			Am28F256, Am28F256A				X8
+512K			Am28F512, Am28F512A				X8
+1M			Am28F010, Am28F010A		Am29F010	X8
+1M							Am29F100	X8 or X16
+2M			Am28F020, Am28F020A		 		X8
+2M							Am29F200	X8 or X16
+4M							Am29F040	X8
+4M							Am29F400/A	X8 or X16
+8M							Am29F080	X8
+16M							Am29F016	X8
+
+
+Embedded Algorithms
+
+The Am28FxxxA and Am29Fxxx families of Flash devices use AMD's Embedded Algorithms, 
+with guaranteed endurance of 100,000 cycles. 
+
+First generation algorithms are characterized by lengthy code which is specific to the application. 
+They are time-consuming and expensive to write and debug. The cost of the long software 
+development time and lost opportunity from time-to-market delays is passed on to the user. Also 
+of concern is the potential impact on system reliability from overstressing a Flash device. 
+Improper writing or erasing can cause latent field failures that affect endurance, resulting in 
+costly equipment returns to the manufacturer.
+
+AMD's 2Mbit Flash was the first to use the Embedded Algorithms. AMD's Embedded Program 
+Algorithm greatly simplified the first generation algorithm. The processor only has to issue write 
+setup and write commands. The internal state machine then takes control of the write operation. 
+The processor simply performs data polling until the write operation is complete. The Embedded 
+Erase Algorithm writes zeros to each byte, then performs the erase. Control is internal and 
+transparent to the host processor.
+
+The advantages of Embedded Algorithms include the following:
+
+1.	System overhead is reduced. The processor is freed to perform other functions during 
+Flash program and erase because the algorithms are completely automatic.
+
+2.	Program and erase time is reduced. Now, program and erase algorithms are efficient, 
+which decreases CPU overhead, and, thus, time to perform those functions.
+
+3.	Endurance is improved. AMD's Embedded Algorithms include a self-correcting 
+mechanism that allow Flash devices incorporating them to operate a minimum of 
+100,000 write cycles. This is a tremendous improvement over the 10,000 cycles 
+expected from parts without Embedded Algorithms. 
+
+In addition, AMD's Embedded Algorithms conform to JEDEC standards which outline self 
+programming procedures for Flash devices.
+
+
+
+
+Software Design Guide
+
+Source Code
+
+The Flash Development Kit provides the source code necessary to read, program and 
+erase AMD Flash devices, namely the 28F256A, 28F512A, 28F010A, 28F020A, 29F010, 
+29F040, 29F080, 29F016, 29F100, 29F200 and 29F400/A (Top and Bottom). These 
+devices use the AMD's proprietary Embedded Algorithms.
+
+Additionally, the kit supports the standard Flasherase and Flashrite algorithm devices 
+such as 28F010 and 28F020, with minor exceptions for the 28F256 and 28F512.
+
+The source code is available in C language. C is portable across many hardware 
+platforms, including x86, AMD 29K and 68K platforms. Thus, all that is needed to use 
+the code on a different platform is to re-compile the source code.
+
+The source code provides a solution to the user for interfacing AMD Flash devices with 
+Embedded Algorithms, as well as compatible support for AMDs Flashrite and Flasherase 
+devices.
+
+For the Am28F256A, Am28F512A, Am28F010A and Am28F020A devices, the following 
+routines are available:
+
+		1.	Embedded Erase routine
+		2.	Embedded Program routine
+		3.	Autoselect routine
+		4.	Reset routine
+		5.	Data Polling algorithm (DQ7/DQ5)
+		6.	Toggle Bit Polling algorithm (DQ6/DQ5)
+		7.	Any additional variables required
+
+For the Am29F010, Am29F040, Am29F080, Am29Fx00 and Am29F016 devices, the 
+following routines are available:
+
+		1.	Embedded Erase routine
+		2.	Embedded Program routine
+		3.	Embedded Sector Erase routine
+		4.	Autoselect routine
+		5.	Reset routine
+		6.	Data Polling algorithm (DQ7/DQ5)
+		7.	Toggle Bit Polling algorithm (DQ6/DQ5)
+		8.	Sector Verify routine
+		9.	Erase Suspend routine
+		10.	Any additional variables required
+
+
+
+
+
+
+
+
+
+Source Code - continued
+
+For the Am28F256, Am28F512, Am28F010 and Am28F020, the following routines are 
+available:
+
+		1.	Single and Parallel Flasherase routines
+		2.	Single and Parallel Flashrite routines
+		3.	Autoselect routine
+		4.	Reset routine
+		5.	Any additional variables required 
+
+Additionally, the source code is commented for clarification, as well as described further 
+in this document.
+
+Suggestions are also included in this text and in the source code as to how to implement:
+
+		1.	Host system interface routines
+		2.	Control signal routines
+		3.	Error handling
+
+
+
+What is not included
+
+Prior to recompiling the AMD Flash source code, the user must provide routines to 
+perform the following:
+
+		1.	User interface (GUI)
+		2.	Routines to load files for programming
+		3.	Routines to interface to the user hardware
+		4.	Routines to issue control signals for Vpp generation, etc.
+		5.	(Optional) Error handling routines
+		6.	Timer routines for Standard algorithm devices
+
+Some suggestions are provided for an x86 ISA Bus implementation, which are a subset 
+of the AMD Embedded Flash Development Kit software. Places in the source code 
+where additional routines are needed are indicated by comments (/*...*/).
+
+
+
+What you should be aware of
+
+Portions of this code have been tested. 
+
+The 29F100, 29F200 and 29F400 devices are supported in Top and Bottom 
+architectures. The only way to distinguish this is issuing a Device ID operation. 
+Additionally, the routines provided are only for a 16-bit mode.
+
+Sector protect and unprotect routines are not available in this release of code. AMD 
+requests that a programmer from a qualified 3rd party vendor (such as Data I/O (TM)) be 
+used to protect and unprotect the devices. This will ensure that the devices and the 
+user's design will not be damaged due to the high voltages needed to be present on 
+various pins of the flash device, and possible timing issues.
+
+Be aware the the 28F256 and 28F512 do not have internal stop-timers. Stop-timer code 
+in resolution of microseconds must be inserted in order to use these devices.
+
+Finally, there have been fab conversions for 29F040 and 29F400 devices. This source 
+code supports both version of 29F040 devices, and the 29F400 is supported both in 
+original and 29F400A form. Please contact your local sales office for information on the 
+differences between each device.
+
+
+Installing the Software
+
+Your source code can be installed as follows: 
+
+Create a directory for holding the files:
+
+					MD C:\AMDSRC
+
+If a directory already exists, use a different name than 'AMDSRC'. Once the directory is 
+created, copy the files to the directory:
+
+					COPY A:\*.* C:\AMDSRC
+
+The software installation is complete! You are now ready to use the AMD Embedded 
+Flash Source Code.
+
+
+
+Using the Source Code
+
+Requirements for developing with the AMD Flash source code:
+
+		1.	Host system
+		2.	C compiler and linker (Assembler is optional)
+		3.	AMD Flash source code
+		4.	User routines 
+
+Using the source code is quite simple. Simply incorporate the routines (with any 
+modifications required as suggested by comments) into the application in development, 
+and recompile as usual.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Description of Source Code
+
+This section will describe each routine in text and in pseudocode.
+
+Embedded Erase
+
+The Embedded Erase function performs a Chip Erase on the device. This effectively 
+clears all data from the device, returning all locations to a value of FF hexadecimal. 
+When the routine is called, the device is classified as a 28FxxxA or a 29F device (if 29F, 
+then check for protected sectors to obtain a polling address that is not within any 
+protected sector; note that Chip Erase will not erase Protected sectors), and after 
+variable setup, the Unlock sequences are sent (user routine), as required per device. In 
+the case of the 28F device, additional setup is required to prepare the device with 12V 
+on Vpp, as well as 12V removal. Devices are then in the Chip Erase cycle. Immediately 
+after, the polling routines are executed (depending on which polling routine was 
+selected). On return, if successful, 28F devices are stepped down from 12V to 5V on the 
+Vpp line.
+
+Pseudocode:
+1.	Classify device: 28FxxxA or 29F. If 29F, check for protected sectors. If all sectors 
+	are protected, abort Chip Erase operation.
+2.	Setup variables, and addresses (and voltages for 28FxxxA devices)
+3.	Send Unlock sequences, according to device
+4.	Enter polling routines
+5.	On return, if successful, power down devices (if 28F) and return to main program. If 
+	not successful, flag as error (unsuccessful Chip Erase)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Description of Source Code - continued
+
+Standard Erase Algorithm (Flasherase)
+
+The Standard Erase algorithm performs erase on the Am28Fxxx devices.  Erase is a 
+bulk operation.  Therefore once erase is initiated, the entire memory array is deleted.  
+Before erasure is initiated, the entire memory array must be in a programmed state (i.e. 
+all bytes must have 00H data).  To ensure that the device is in a programmed state, we 
+must program the entire memory array before erasure.  Please reference the Standard 
+Program algorithm section of this document.  Once all of the bytes in the memory array 
+are programmed to a 00H state, we can begin erasure.  Erasure is a two bus cycle 
+command sequence in which 20H must be written consecutively to the device.  The 
+memory array must then be exposed to an erase pulse for 10ms.  After completing this 
+time out, the erase verify command, A0H, must be written to the device.  Verification is 
+performed on a byte by byte basis.  Therefore, the first byte is verified after a 6*s time 
+out followed by reading the byte.  If the byte fails to be erased, another erase command 
+is given to the memory array and the entire routine is repeated.  This routine can be 
+repeated for a maximum of 1000 times.  After 1000 repetitions, the device has failed 
+erasure.  If the byte is erased, the byte address is incremented and the next byte 
+undergoes the verification procedure.  Once the last address is verified, erasure is 
+completed.  Although this algorithm is more rigorous than the Embedded Erase 
+algorithm, every step is vital to successful device erasure.   
+
+Pseudo-code:
+1.	Classify device: Am28F010, Am28F020, Am28F512, Am28F256
+2.	Program all bytes in the memory array to a 00H state (Refer to Standard Program               
+	Algorithm section of document) 
+3.	Setup variables 
+4.	Write erase set-up command 
+5.	Write erase command
+6.	Expose memory array to erase pulse for 10ms
+7.	Issue program verify command, A0H
+8.	Time out 6ms and verify byte address location.  Initially, begin with the first address 
+	in memory array.
+9.	Read data from address location
+10.	If byte is erased, check to see if it is the last byte address location is memory array.  
+	If it is not the last address in the memory array increment to the next address and 
+	return to step 7.  If byte is not erased, return to step 4 as required for a maximum of 
+	1000 times.
+11.	If a byte requires more than 1000 routine iterations, the memory array has failed to 
+	erase. Return to main menu.
+
+
+
+
+
+
+
+
+
+
+
+
+
+Description of Source Code - continued
+
+Standard Parallel Erase Algorithm
+
+The Standard Parallel Erase Algorithm erases two Am28F010 or Am28F020 devices 
+simultaneously.  The Standard Erase (Flasherase) algorithm is initiated concurrently on 
+both devices.  Please refer to the "Standard Erase Algorithm (Flasherase)" portion of this 
+document for a detailed description of programming.  An erase pulse is given to each 
+device.  If the device has data FFH, the device has been successfully erased.  If the 
+data is not FFH, we must determine which device has not successfully erased.  Once we 
+have determined which device is erased, the successfully erased device must be 
+masked with a two bus cycle FFH sequence, while the unsuccessfully erased device 
+receives another erase pulse.  This routine continues for a maximum of 1000 iterations.
+
+Pseudo-code:    
+1.	Set-up variables and voltages
+2.	Send the erase command sequence to the devices simultaneously.  For a more 	 	 
+	detailed description of the standard erase algorithm, refer to the "Standard Program 
+	algorithm (Flasherase)" portion of this document.
+3.	Each device is given an erase pulse.
+4.	Verify that each device has been completely erased.
+5.	If they do not verify, determine which device requires more erase pulses to be 	 
+	completely erased.
+6.	If both devices require more erase pulses, return to step 2.  If one device has 		 
+	successfully erased, then mask the device with a two bus cycle FFH  	   		   	       
+	sequence, while issuing the standard erase algorithm to the other device again. This 
+	routine can continue for a maximum of 1000 iterations.  After 1000 iterations, the 
+	device that is not erased has failed erasure.
+7.	If both devices successfully erase, then parallel erase is completed. Return to main
+	menu.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Description of Source Code - continued
+
+Program
+
+The Program function performs the Sequential Byte Program, individual Byte Program 
+or individual Word Program on the device. This routine allows a program or data to be 
+stored on the Flash device, although prior to programming, the device should have been 
+erased if all locations to be programmed are not FF hexadecimal. When the routine is 
+called, the device is classified as a 28Fxxx, 28FxxxA or a 29F device. If is a 29F device, 
+it is checked for any protected sectors, and in this revision of software, will abort the 
+Program operation, until the sectors have been unprotected. Note that the user must 
+supply a routine to provide the data to be programmed, as well as appropriate 
+addresses. Following variable setup, it calls either std_program() or emb_program(), and 
+sends the byte and address to program at. In the case of the 28F device, additional 
+setup is required to prepare the device with 12V on Vpp. Devices are then in the Byte 
+Program cycle. On return from either program routine, if successful, the address is 
+checked against the final address (to check if this was the last byte to be programmed). 
+If so, 28F device are stepped down from 12V to 5V on the Vpp line. If not finished Byte 
+programming, the routine is executed again from the point of obtaining the data to be 
+programmed.
+
+Pseudocode:
+1.	Classify device: 28F, 28FxxxA or 29F. If 29F, check for protected sectors. If any 
+	sectors are protected, abort Program operation.
+2.	Setup variables (and voltages for 28F devices)
+3.	Obtain address and data to program (sequential and individual program)
+4.	Send to std_program() or emb_program()
+5.	On return from either program routine, if successful, check to see if there are more 
+	bytes to program. If not successful, flag as error (unsuccessful Byte Program)
+6.	If there are more bytes to program, return to step 3, and continue as before.
+	If finished, power down devices (for 28F) and return to main program.
+
+
+
+Embedded Program
+
+The Embedded Program function performs the actual Byte Program on the device.  
+Following variable setup, the Unlock sequences are sent (user routine), with the final 
+Unlock cycle being the actual byte to program at the appropriate address. Both devices 
+are then in the Byte Program cycle. Immediately following this, the polling routines are 
+executed (depending on which polling routine was selected). It then returns to the 
+Program routine.
+
+Pseudocode:
+1.	Obtain address and data to program
+2.	Send Unlock sequences, according to device
+3.	Enter polling routines
+4.	Return to Program routine.
+
+
+
+
+
+
+Description of Source Code - continued
+
+Standard Program Algorithm (Flashrite)
+
+The Standard Program algorithm performs byte programming on the Am28Fxxx devices.  
+Prior to programming, all address locations to be programmed must be erased to an 
+FFH state; otherwise, erroneous data will exist.  Byte programming requires a two bus 
+cycle command sequence in which the program set-up command of 40H must be written 
+to the device followed by the program address and data on the consecutive bus cycle.  
+Please note that the user must supply a routine to provide the data and addresses to be 
+programmed.  Once the program command sequence is completed, the address location 
+is exposed to a program pulse.  The address location is then verified using the program 
+verify command, C0H.  If the byte is not programmed, another program pulse is issued 
+to the address location.  In this manner, a maximum of 25 pulses can be issued to the 
+byte.  If the byte requires more than 25 programming pulses, the byte will fail to 
+program.  If the byte programs within the 25 programming pulses, the byte has been 
+successfully programmed.  This routine is used to program any byte in the memory 
+array.
+Although this algorithm is more rigorous than the Embedded Program algorithm, every 
+step is vital to successful byte programming.
+
+Pseudo-code:
+1.	Classify device: Am28F010, Am28F020, Am28F512, Am28F256
+2.	Setup variables and voltages
+3.	Obtain address and data to program 
+4.	Send program command
+5.	Send byte program address and data
+6.	Expose byte to program pulse for 10*s minimum
+7.	Issue program verify command, C0H
+8.	Time out 6*s for byte verification
+9.	Read data from device
+10.	If byte is programmed correctly, check to see if there are more bytes to program.  If 
+	it is not successfully programmed, return to step 4 as required for a maximum of 25 
+	times.
+11.	If the byte requires more than 25 routine iterations, the byte has failed to program. 
+	If the programming was or was not successful, return to program().
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Description of Source Code - continued
+
+Standard Parallel Programming Algorithm
+
+The Standard Parallel Programming Algorithm programs two Am28F010 or Am28F020 
+devices simultaneously.  A word of data is sent to the two devices.  The word is then split 
+into two bytes, a lower byte and an upper byte, with each device receiving one unique 
+byte.  The word is then stored for future verification.  Device 1 receives the upper byte 
+and device 2 receives the lower byte, simultaneously.  The Standard Program algorithm 
+is initiated.  Please refer to the "Standard Program Algorithm (Flashrite)" portion of this 
+document for a detailed description of programming.  A program pulse is given to each 
+device.  The programmed word is then compared to the original word.  If the 
+programmed data matches the original data, the word has been successfully 
+programmed.  If the programmed data and original data do not match, we must 
+determine which byte of the word has not successfully programmed.  Once we have 
+determined which device has successfully programmed, the successful byte must be 
+masked with a two bus cycle FFH sequence, while the unsuccessful byte receives 
+another program pulse.  This routine continues until the final word matches the original 
+word or a maximum of 25 iterations, which ever occurs first.
+
+Pseudo-code    
+1.	Set-up variables and voltages
+2.	Check word data against the current devices content to determine if parallel 
+	programming required.
+3.	If data and device content are the same, then no parallel programming is required.
+	Return to Program(). If not, begin parallel programming routine.
+4.	Store word to be programmed for verification later.
+5.	Split word into two bytes, an lower byte and an upper byte.  The upper byte will be 	 
+	programmed in one device and the lower byte in another device.
+6.	Send the program command sequence to the devices simultaneously.  For a more 	 
+	detailed description of the standard program algorithm, refer to the "Standard 
+	Program algorithm (Flashrite)" portion of this document.
+7.	Each device is given one program pulse.
+8.	Verify that each byte is correctly programmed.
+9.	Compare combined upper and lower byte data to original word data.
+10.	If verified, check to see if there are more words to be programmed.  If does not
+	verify, determine which byte requires more program pulses to be programmed.
+11.	If both devices require more program pulses, return to step 6.  If one byte has
+	successfully programmed, then mask this device with a two bus cycle FFH
+	sequence, while issuing the standard program algorithm to the other device again.
+12.	Return to step 6 to continue this routine until the final word matches the original 
+	word or a maximum of 25 iterations, which ever occurs first. Once completed, either 
+	with or without errors, return to program().
+
+
+
+
+
+
+
+
+
+
+
+Description of Source Code - continued
+
+Embedded Sector Erase
+
+This function is quite similar to the Embedded Chip Erase routine. This effectively clears 
+all data on that sector of the device, returning all locations in that sector to a value of FF 
+hexadecimal. The Embedded Sector Erase performs an individual sector erase 
+operation only on 29F devices. If a 28F device is detected, the attempt should be 
+marked as an error. Each device is also checked to see if any sectors are protected and 
+already erased. Erasing an already erased sector does nothing except cycle the device 
+wastefully and cause premature wear. Trying to perform an erase on a protected sector 
+will return an error. There will be an option to perform Erase Suspend, if applicable. 
+Variables are setup, and the Unlock sequences are sent (user routine) with the sector 
+address being sent in the 6th Unlock cycle . Note that multiple sector erase is not 
+supported in this revision of code. The device is then in the Sector Erase cycle. 
+Immediately after, the polling routines are executed (depending on which polling routine 
+was selected). If the Erase Suspend option was selected, then it is performed. After 
+Erase Suspend, the part continues to erase, through the polling routines. On return, if 
+successful, execution should return to the main program. If not successful, an error 
+should be returned. Optionally, if Erase Suspend mode is on, any 29F device (except the 
+29F010) can enter Erase Suspend mode (see erase_suspend()).
+
+Pseudocode:
+1.	Classify device: 28F or 29F. If 28F, mark as error and exit. Select to perform Erase
+	suspend or not.
+	Suggestion: check each sector to determine if it is already erased (all locations
+	read FF hex)
+2.	Setup variables, and address of sector
+3.	Send Unlock sequences, according to device, with the sector address on 
+	the 6th cycle
+4.	Enter polling routines or erase suspend (if selected with proper device)
+5.	On return, if successful, return to main program. If not successful, flag as 
+	error (unsuccessful Sector Erase)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Description of Source Code - continued
+
+Erase Suspend
+
+This routine performs the Erase suspend for all 29F devices (except 29F010) during a 
+Sector Erase operation. It is called from sector_erase(). First, the routine obtains an 
+address that is not currently being erased. Then, it issues the Erase Suspend command, 
+using DQ6 Toggling to detect it is has now entered Erase Suspend mode, also called 
+'pseudo-read mode'.  Once in this mode, a menu is presented where the options are to 
+read from another sector, other than the one being suspended or quit this mode and 
+return to erasing the sector prior to Erase Suspend mode. Note that with the 29F080 and 
+the 29F016, there is the option to program one-byte-at-a-time while in Erase Suspend 
+mode. For both Read and Program sub-options, each address is checked to see that 
+they do not lie within the sector that is erase-suspended. On a Quit, the Erase Suspend 
+Resume command is issued, and the routine returns to sector_erase().
+
+Pseudocode:
+1.	Obtain the monitor address (address not in sector being erased) depending on 
+	device
+2.	Send Erase Suspend command
+3.	Use DQ6 polling to detect when in Erase Suspend mode
+4.	Display Read and Quit options for all devices, Program only for 29F080 and 29F016 
+	devices
+5.	If Read or Program (29F080 and 29F016 only), check if address is valid, else mark	
+	as error 	and return to step 4.
+	If Quit, return to sector_erase().
+6.	If Read, read device at given address. If Program, send address and data to emb_
+	program(), and wait for return. 
+7.	Redisplay menu, after a successful operation and return to step 4. Else, return to
+	sector_erase with error code.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Description of Source Code - continued
+
+Autoselect
+
+The Autoselect routine sets up the device for reading one of three items:
+			1.	Device ID
+			2.	Manuf ID
+			3.	Sector Status (only on 29F devices)
+This is performed by sending an Unlock sequence. Note that by raising A9 to 12V, the 
+autoselect mode can be entered. To exit this mode, a Reset command must be sent. 
+
+To obtain the Manuf. ID, the remaining part of the Unlock sequence must be a read from 
+Address 0000, which should yield data = 01, the AMD code.
+
+To obtain the Device ID, the remaining part of the Unlock sequence must be a read from 
+Address 0001, which will yield for example: A2h (28F010A) or A4h (29F040).
+
+To obtain the Sector Status, please refer to the Sector Verify routine later in this chapter. 
+It uses 12V on address line A9, rather than issuing an Unlock sequence.
+
+Pseudocode:
+1.	Classify device: 28F or 29F
+2.	Send Unlock sequence according to device type
+3.	Read from the device at specified location.
+4.	Check if the data is correct for the device (Device ID or Manuf. ID)
+5.	If the data read is incorrect, flag as error and return to main program. It is 
+	suggested that the main program force the user to select a device before 
+	performing device operations.
+
+
+Reset
+
+The Reset command returns the device back to Read mode. The Reset command 
+consists of 2 FF hex data bytes written to 28F devices and, for simplicity, a F0 hex byte 
+written to 29F devices. Optionally, 29F devices can be written with the Unlock sequence. 
+The Reset command is required for operations such as:
+		1.	Autoselect 
+		2.	Sector Unprotect
+		3.	Sector Protect
+		4.	Fatal error in Programming and Erasing operations
+
+In all other circumstances, the device returns to Read mode automatically, if the user 
+operation was successful. If there was an error in the user operation, the device must be 
+Reset.
+
+Pseudocode:
+1.	Classify device: 28F or 29F
+2.	Send Unlock cycles according to device type
+
+
+
+
+
+
+Description of Source Code - continued
+
+Data Polling Algorithm (DQ7/DQ5)
+
+This algorithm is a method of checking whether Embedded Program or Erase operations 
+are in progress or completed. When an Program operation is in progress, data bit 7 
+(DQ7) is the complement of the original data bit 7, and when DQ7 is identical to the old 
+data and DQ5 is still 0, the operation is complete. To determine if DQ7 is valid, each poll 
+must store the original data for comparison, and if they are the same, there is a good 
+chance that the operation was successful. DQ5 is checked to ensure timing limits have 
+not exceeded. When an Erase operation is in progress, DQ7 is always '0', and will be '1' 
+when finished, so long as DQ5='0'. In all cases, when DQ5 is '1', DQ7 should be checked 
+again, in case DQ7 changed simultaneously with DQ5. If DQ7 = true data (Program) or 
+DQ7 = '1' (Erase), the operation is successful and execution should return to the caller. A 
+suggested second read will provide all true data (Program) or all FFh (Erase). Otherwise, 
+this should be flagged as an error, and the device should be Reset (according to the 
+device). Thus, the code for this routine is split into a Program section and an Erase 
+section (Chip and Sector). Note that for an Erase operation on a 29F device, the polling 
+address must not be for one within a protected sector.
+
+Pseudocode:
+1.	If operation is erase, go to 2a. If operation is program, go to 2b.
+2a.	If device is 29F, use a polling address that is not protected.
+3a.	Read data.
+4a.	If DQ7 data does not equal '1', go to step 5a. If so, operation is successful. 
+	Return to calling routine.
+	Suggestion: (success) read again for true data (Program) or FFh (Erase). 
+5a.	Check if DQ5 is '0'. If so, continue with step 3a. Otherwise (DQ5=1), read again 
+	and continue with step 6a.  
+6a.	If DQ7 is not equal to '1', then time limits were exceeded, therefore, flag as error, 
+	reset the device and return to caller. If DQ7 is '1', operation is successful. Return 
+	to calling routine.
+	Suggestion: read again for true data (Program) or FFh (Erase), and if not correct,
+	then issue an error, and return to caller. 
+2b.	Read data.
+3b.	If DQ7 is not true data, go to step 4b. If so, operation is successful. Return to 
+	calling routine.
+	Suggestion: read again for true data (Program) or FFh (Erase), and if not correct,
+	then issue an error, and return to caller.
+4b.	Check if DQ5 is '0'. If so, continue with step 2b. Otherwise (DQ5=1), read again 
+	and continue with step 5b.
+5b.	If DQ7 is not equal to true data, then time limits were exceeded, therefore, flag 
+	as error, reset the device and return to caller. Otherwise, operation was success-
+	ful. Return to caller.
+
+
+
+
+
+
+
+
+
+
+Description of Source Code - continued
+
+Toggle Bit Algorithm (DQ6/DQ5)
+
+This algorithm is an alternative method of checking whether Embedded Program or 
+Erase operations are in progress or completed. When an operation is in progress, data 
+bit 6 (DQ6) is constantly toggling, and when DQ6 no longer toggles and DQ5 is still 0, 
+the operation is complete. To determine if DQ6 has toggled, each poll requires 2 reads 
+of data, and if they are the same, there is a good chance that the operation was 
+successful. DQ5 is checked to ensure timing limits have not exceeded. In all cases, 
+when DQ5 is '1', DQ6 should be checked again, in case DQ6 changed simultaneously 
+with DQ5. If DQ6 has stopped toggling, the operation is successful and execution should 
+return to the caller. A suggested second read will provide all true data (Program) or all 
+FFh (Erase). Otherwise, this should be flagged as an error, and the device should be 
+Reset (according to the device).
+
+Pseudocode:
+1.	If device is 29F and the operation is Erase, then use a polling address that is not
+	protected.
+2.	Read data. (DQ6-1)
+3.	Read data. (DQ6-2)
+4.	If DQ6-1 equals DQ6-2, then the operation is successful, and execution should 
+	return to the caller. If not, then DQ6 is still toggling, and continue with step 5.
+	Suggestion: (success) read again for true data (Program) or FFh (Erase)
+5.	Check if DQ5 is '0'. If so, continue with step 2. Otherwise (DQ5=1), read again 
+	and continue with step 6.
+6.	If data read is not true data (Program) or FFh (Erase), then time limits were 
+	exceeded and DQ6 is still toggling (error). So, flag as error, reset the device and
+	return to caller. Otherwise, operation was successful and return to caller.
+
+
+Sector Verify
+
+This function is used only with 29F devices, except 29F080 and 29F016. The sector 
+status register is read to obtain the status of the sector being queried (whether it is 
+protected or unprotected). This is accomplished by raising address line A9 to 12V, and 
+sending the appropriate sector address (for each sector) offset by 2 (the sector status 
+register is always at location xxxxxxx2 in any sector, where x=sector address). Once this 
+has been obtained, the device must be reset back to Read mode. It is suggested to store 
+the sector status data in a variable for use later. The sector status data will not change 
+unless a Sector Protect/Unprotect operation is performed, at which time will require 
+another Sector Verify to read correct data.
+
+Pseudocode:
+1.	Set address line A9 to 12V
+2.	Send sector address with location 2
+3.	Read device. If data read is 0, sector is unprotected. Else, it is protected (1). 
+	Suggestion: store data in a variable, for later use.
+4.	If there are more sectors to query, increment sector address and continue with 
+	step 2. If finished, go to step 5.
+5.	Remove 12V from A9, and return to menu.
+
+
+
+Description of Source Code - continued
+
+Any additional variables required
+
+It is up to the user to maintain variables, but for this source code, the variables required 
+to be maintained globally are:
+		1.	Current address and data
+		2.	Easy reference array for sector addresses for 29F devices
+		3.	Easy reference array for device type and ID parameters
+
+In addition, there should be some global and local temporary storage for scratch 
+variables.
+
+
+Suggested Routines
+
+Host System Interface: A sample function for PC x86 ISA-bus environments would be to 
+use the C equivalent of in and out statements, which poke into I/O addresses. Optionally, 
+the interface may be simpler if the device is memory mapped into the system. The latter 
+approach would only require a pointer to the address, whereas an I/O mapped 
+implementation requires extra statements to send data. In the case of the Flash 
+Development Kit, the bus size is limited to 16 bits for address and 8 bits for data. So, to 
+maximize flexibility, the user may assign I/O ports for different functions, such as 
+address only, data only, control only, etc.
+
+Control Signals: In order to accomodate 12v requirements for programming and erasing 
+28F devices, there may be a register implemented in the hardware that must be written 
+to. Therefore, interfacing to this register will require a routine to obtain requests and send 
+the data to that hardware register. This will enable interactive control of all functions that 
+can be performed on the Flash device.
+
+Error Handling: Almost every function has the capability of returning an error code when 
+something goes wrong. This is critical to handle in the polling algorithms, since they 
+verify whether the operation has completed successfully. Additionally, selecting a wrong 
+device can have adverse effects on the main program in certain operations (such as 
+using a 28F device for sector erase). It is highly recommended to have error handling 
+and reporting routines. In most cases, a Program or Erase error is fatal, and the device 
+may be defective. It is reasonable to try the operation again. (See the Error Handling 
+error descriptions next)
+
+User Interface: A user interface routine would be helpful to illustrate the events occuring, 
+and any error messages reported (or alternatively, successful operations).
+
+Loading files/data: For programming operations, if the device is programmed from files, 
+then there needs to be routines to load and check files. Binary files are easiest to 
+implement support for, and have no specific address hardwired into it, as opposed to 
+Intel Hex format files, where the address to program is in the file itself. Likewise, writing 
+('dumping') data from the flash to a monitor screen or file requires support.
+
+Select Device: If the software is used to interface to multiple devices, then there should 
+be an option to select an appropriate device intended for operation. This also means that 
+there should be appropriate checks in the software that are device-specific, such as 
+toggling Vpp for 28Fxxx devices and not for 29Fxxx devices.
+
+Timer routines: Routines with microsecond timer resolution should be used for efficiency, 
+as programming any device while timing out with millisecond timers can be quite 
+lengthy.
+
+
+
+
+Errors
+
+A sample Error handling routine is included in this source code. Note that not all error 
+messages are applicable to this source code.
+
+Error messages are indicated by a '(x)' starting the error message, where x is the 
+message number. Errors displayed start with x = 10.
+
+Error #10:	No file name entered!
+Error #11:	Input filename missing!
+
+Explanation:	The EDK software request a filename be entered, but was not received.
+Solution:	At the program's request, enter a filename.
+
+Error #12/#14:	File name problem!
+
+Explanation:	The filename entered was not correct.
+Solution:	Check to see if the file actually exists and is spelled correctly.
+
+Error #13:	Fseek failed!
+
+Explanation:	A read check of the file failed. 
+Solution:	Check to see if the data is valid, if possible. This could be a bad file.
+
+Error #14:	(See Error #12)
+
+Error #15:	Error: EOF reached before checking file.
+
+Explanation:	An EOF (End-of-file) character was found before any data could be
+		processed.
+Solution:	This could be a bad file, or a file with no data in it (i.e., 0 bytes long).
+
+Error #16:	Error: <filename> is not an Intel Hex formatted file!
+
+Explanation:	The file chosen to be read as Intel Hex format was not appropriately 
+		formatted as such.
+Solution:	Enter a filename for a file that is Intel Hex formatted. If the file looks like
+		an Intel Hex format, then it could be that the file is bad or is a different
+		format that does not adhere strictly to the Intel Hex format.
+
+Error #17/24:	Error: byte count not 0 on 01 record.
+
+Explanation:	The Intel Hex format file was formatted incorrectly. Bad file. A 01 record
+		is an end of file which should have a byte count of 0 for that line.
+Solution:	Try to obtain a better copy of the file. 
+
+Error #18/25:	Error: checksum not FF on 01 record.
+
+Explanation:	The Intel Hex format file was formatted incorrectly. Bad file. A 01 record
+		is an end of file which should have a checksum of FF hexadecimal for 
+		that line.
+Solution:	Try to obtain a better copy of the file.
+
+Error #19/29:	Not recognized record code.
+
+Explanation:	There are only 4 record codes allowed in an Intel Hex file format. The 
+		one detected is invalid.
+Solution:	If possible, check the file for valid record codes. Else, ensure the file 
+		loaded is Intel Hex format compatible.
+
+Error #20:	Error: data count exceeded 512 characters.
+
+Explanation:	The data on a line from an Intel Hex format file exceeded 512 characters
+		and cannot be held in the temporary storage area. The FDK will only
+		allow data lines of 512 characters or less.
+Solution:	Try to create a similar Intel Hex file with a data line size of 512 bytes or
+		less.
+
+Error #21:	Found ':' at position 0
+
+Explanation:	A ':' was found in the temporary storage area. This is indication of a 
+		badly formatted Intel Hex file.
+Solution:	Try to obtain a better copy of the file. If it is possible to visually inspect
+		the file, ensure there are no double ':'.
+
+Error #22:	Error in input record field.
+
+Explanation:	A critical parameter field in the Intel Hex file is corrupt. This is indication
+		of a badly formatted Intel Hex file.
+Solution:	Try to obtain a better copy of the file.
+
+Error #23:	Error:	01 encountered but not finished
+
+Explanation:	An end-of-file record pointer was found, but no EOF character was found
+		in that line.
+Solution:	Try to obtain a better copy of the file. Ensure that after the last data in 
+		the file, there is nothing else.
+
+Error #24:	(See Error #17)	
+
+Error #25:	(See Error #18)
+
+Error #26:	Error: byte count not 2 on 02
+
+Explanation:	A '2' was not found in the data record parameter. This is an indication
+		of a badly formatted Intel Hex format file.
+Solution:	Try to obtain a better copy of the file.
+
+Error #27:	Error: addr not 0000 on 02 record
+
+Explanation:	The address field parameter on a data line of the Intel Hex format file is
+		incorrect. This is an indication of a badly formatted Intel Hex format file.
+Solution:	Try to obtain a better copy of the file.
+
+Error #28:	Error: 03 encountered again in header.
+
+Explanation:	An 03 record is a start-of-file indicator. It should only be encountered 
+		once. A second occurence is an indication of a badly formatted Intel
+		Hex format file.
+Solution:	Try to obtain a better copy of the file. Or, search for the faulty record(s)
+		and change them.
+
+Error #29:	(See Error #19)
+
+Error #30:	Warning: All sectors protected. Cannot erase.
+
+Explanation:	Sectors were verified on a 29F device prior to erasing, and all sectors
+		were reported as protected. Therefore, a Chip Erase could not be
+		performed.
+Solution:	Unprotect at least one sector. Note that the Chip Erase will only erase
+		those sectors that are not protected.
+
+Error #31:	Some sectors are protected. Please unprotect first.
+
+Explanation:	Sectors were verified on a 29F device prior to programming, and some
+		sectors were reported as protected. In this version of software, a
+		program operation cannot continue if any sectors are protected.
+Solution:	Unprotect all sectors. Try to program around areas that need to remain
+		unmodified.
+
+Error #32:	This function is not applicable to 28F series devices.
+
+Explanation:	The selected function is not available for 28F devices, onlt for 29F
+		devices. All sector functions (erase, protect, unprotect) are available only 
+		to 29F devices.
+Solution:	Use only 28F functions (non-sector functions)
+
+Error #33:	This sector is protected. Cannot perform the erase w/o 
+		unprotecting first.
+
+Explanation:	The selected sector for erasing was protected.
+Solution:	Unprotect the sector, if you are sure it is to be erased. A 
+		protected sector is inherently protected from accidental erasures.
+
+Error #34:	Cannot re-erase sector.
+
+Explanation:	The selected sector was already in 'Erased' status. The FDK software
+		does not allow it to be re-erased.
+Solution:	Select a sector that reports as 'Unerased'.
+
+Error #35:	PLSCNT exceeds 25. Aborting...
+
+Explanation:	The current operation has exceeded the maximum allowed error count.
+		This indicates that the operation failed after 25 retries, and that this is
+		probably a defective device.
+Solution:	If there is access to a device tester, such as a Data I/O programmer, 
+		verify that the part fails on it. If not, retry the operation on the FDK and if 
+		it still fails, notify AMD. Otherwise, the part is bad and should not be 
+		used.
+
+Error #36:	Cannot re-protect this sector.
+
+Explanation:	The selected sector was already in 'Protected' status. The FDK software
+		does not allow it to be re-protected.
+Solution:	Select an 'Unprotected' sector to protect, or unprotect this sector.
+
+Error #37:	Cannot re-unprotect this sector.
+
+Explanation:	The selected sector was already in 'Unprotected' status. The FDK 
+		software does not allow it to be re-unprotected.
+Solution:	Select a 'Protected' sector to unprotect, or protect this sector.
+
+Error #38:	PLSCNT exceeds 1000. Aborting...
+
+Explanation:	The current operation has exceeded the maximum allowed error count.
+		This indicates that the operation failed after 1000 retries, and that this is
+		probably a defective device.
+Solution:	If there is access to a device tester, such as a Data I/O programmer, 
+		verify that the part fails on it. If not, retry the operation on the FDK and if 
+		it still fails, notify AMD. Otherwise, the part is bad and should not be 
+		used.
+
+Error #39:	DQ6-Programming failure. Address = xxxx, curr_data = yy, 
+		in_data = zz
+
+Explanation:	There was a programming failure at address xxxx, using the Toggle Bit
+		algorithm. The data programmed was yy (curr_data), but read back as
+		zz (in_data).
+Solution:	Retry the programming operation. If the error does not happen at the 
+		same address again, then it will continue. If the error happens again, the
+		device is bad (hard error).
+
+Error #40:	DQ6-Programming failure after DQ5=1. Address = xxxx, 
+		curr_data = yy, in_data = zz
+
+Explanation:	There was a programming timeout at address xxxx, using the Toggle Bit
+		algorithm. The data programmed was yy (curr_data), but read back as
+		zz (in_data) at the moment of the timeout. This timeout is dictated by the
+		device itself and is the maximum time it should take to program data at 
+		that address.
+Solution:	Retry the programming operation. If the error does not happen at the 
+		same address again, then it will continue. If the error happens again, the
+		device is bad (hard error).
+
+Error #41:	DQ6-Programming failure after DQ5=1. DQ6 never stops toggling. 
+		Address = xxxx
+
+Explanation:	There was a programming failure at address xxxx, using the Toggle Bit
+		algorithm. DQ6 never stopped toggling status, even after the moment of 
+		the timeout. This timeout is dictated by the device itself and is the 
+		maximum time it should take to program data at that address.
+Solution:	Retry the programming operation. If the error does not happen at the 
+		same address again, then it will continue. If the error happens again, the
+		device is bad (hard error).
+
+Error #42:	DQ6-Erase failure. in_data = zz
+
+Explanation:	There was an erase failure, using the Toggle Bit algorithm, and the data 
+		read back as zz (in_data) and not FF hexadecimal.
+Solution:	Retry the erase operation. If the error does not happen again, then the
+		operation will continue. If the error happens again, the device is probably
+		bad (hard error).
+
+Error #43:	DQ6-Erase failure after DQ5=1. in_data = zz
+
+Explanation:	There was an erase failure, using the Toggle Bit algorithm, and the data
+		read back as zz (in_data) and not FF hexadecimal, at the moment of 
+		timeout. This timeout is dictated by the device itself and is the maximum
+		time it should take to erase that location.
+Solution:	Retry the erase operation. If the error does not happen again, then the
+		operation will continue. If the error happens again, the device is probably
+		bad (hard error).
+
+Error #44:	DQ6-Erase failure on 28F device. Chip is bad.
+
+Explanation:	There was an erase failure, using the Toggle Bit algorithm. DQ6 never 
+		stopped toggling status, even after the moment of the timeout. This 
+		timeout is dictated by the device itself and is the maximum time it should 
+		take to erase at that location.
+Solution:	Retry the erase operation. If the error does not happen at the 
+		same address again, then it will continue. If the error happens again, the
+		device is bad (hard error).
+
+Error #45:	DQ6-Erase failure on 29F device. Sector is bad.
+
+Explanation:	There was an erase failure, using the Toggle Bit algorithm. DQ6 never 
+		stopped toggling status, even after the moment of the timeout. This 
+		timeout is dictated by the device itself and is the maximum time it should 
+		take to erase at that location.
+Solution:	Retry the erase operation. If the error does not happen at the 
+		same address again, then it will continue. If the error happens again, the
+		sector is bad (hard error), and it is recommended to use another device.
+
+Error #46:	DQ7-Programming failure. Address = xxxx, curr_data = yy, 
+		in_data = zz
+
+Explanation:	There was a programming failure at address xxxx, using the Data Polling
+		algorithm. The data programmed was yy (curr_data), but read back as
+		zz (in_data).
+Solution:	Retry the programming operation. If the error does not happen at the 
+		same address again, then it will continue. If the error happens again, the
+		device is bad (hard error).
+
+Error #47:	DQ7-Programming failure after DQ5=1. Address = xxxx, 
+		curr_data = yy, in_data = zz
+
+Explanation:	There was a programming timeout at address xxxx, using the Data 
+		Polling algorithm. The data programmed was yy (curr_data), but read 
+		back as zz (in_data) at the moment of the timeout. This timeout is 
+		dictated by the device itself and is the maximum time it should take to 
+		program data at that address.
+Solution:	Retry the programming operation. If the error does not happen at the 
+		same address again, then it will continue. If the error happens again, the
+		device is bad (hard error).
+
+Error #48:	DQ7-Programming failure after DQ5=1. Address = xxxx.
+
+Explanation:	There was a programming failure at address xxxx, using the Data Polling
+		algorithm. DQ7 never showed true data, even after the moment of 
+		the timeout. This timeout is dictated by the device itself and is the 
+		maximum time it should take to program data at that address.
+Solution:	Retry the programming operation. If the error does not happen at the 
+		same address again, then it will continue. If the error happens again, the
+		device is bad (hard error).
+
+Error #49:	DQ7-Erase failure. in_data = zz
+
+Explanation:	There was an erase failure, using the Data Polling algorithm, and the 
+		data read back as zz (in_data) and not FF hexadecimal.
+Solution:	Retry the erase operation. If the error does not happen again, then the
+		operation will continue. If the error happens again, the device is probably
+		bad (hard error).
+
+Error #50:	DQ7-Erase failure after DQ5=1. in_data = zz
+
+Explanation:	There was an erase failure, using the Data Polling algorithm, and the 
+		data read back as zz (in_data) and not FF hexadecimal, at the moment 
+		of timeout. This timeout is dictated by the device itself and is the 
+		maximum time it should take to erase that location.
+Solution:	Retry the erase operation. If the error does not happen again, then the
+		operation will continue. If the error happens again, the device is probably
+		bad (hard error).
+
+Error #51:	DQ7-Erase failure on 28F device. Chip is bad.
+
+Explanation:	There was an erase failure, using the Data Polling algorithm. DQ7 never 
+		showed a '1', even after the moment of the timeout. This timeout is 
+		dictated by the device itself and is the maximum time it should take to 
+		erase at that location.
+Solution:	Retry the erase operation. If the error does not happen at the 
+		same address again, then it will continue. If the error happens again, the
+		device is bad (hard error).
+
+Error #52:	DQ7-Erase failure on 29F device. Sector is bad.
+
+Explanation:	There was an erase failure, using the Data Polling algorithm. DQ7 never 
+		showed a '1', even after the moment of the timeout. This timeout is 
+		dictated by the device itself and is the maximum time it should take to 
+		erase at that location.
+Solution:	Retry the erase operation. If the error does not happen at the 
+		same address again, then it will continue. If the error happens again, the
+		sector is bad (hard error), and it is recommended to use another device.
+
+Error #53:	Error: address exceeds device limits.
+
+Explanation:	The address entered exceeds the maximum address on the device.
+Solution:	Enter an address within the range of the device.
+
+Error #54:	Error: undetermined break in read_hex()
+
+Explanation:	An error was encountered in the parsing routine. This indicates a bad
+		Intel Hex formatted file.
+Solution:	Try to obtain a better copy of the file.
+
+Error #55:	Reserved
+
+Error #56:	Reserved
+
+Error #57:	Reserved
+
+Error #58:	Reserved
+
+Error #59:	Error: The device in this socket is either not an AMD device or 
+		there is no device in the socket, not a xxxx. Please power down 
+		and remove the device.
+
+Explanation:	The device detected in the socket was not identified correctly as an
+		AMD device (xxxx).
+Solution:	Check that the socket is populated, and that there is an AMD
+		Embedded Algorithm device inserted.
+
+Error #60:	(See Error #59)
+
+Note	  This is a critical error. Most likely, an AMD device was not inserted.
+
+Error #61:	Error! You must select a device first in order to use this function.
+
+Explanation:	A device is not currently selected, so access to any functions (except
+		[A], [D], [S], [T], or [Q]) is prohibited.
+Solution:	Select a device, using menu option [D].
+
+Error #62:	Aborting programming...The last address of file to program exceeds
+		this device's maximum limit. Please select a larger device or smaller
+		file to program.
+
+Explanation:	The last (highest) address in the file to program exceeded the last 
+		(highest) address of the device. Programming aborts.
+Solution:	Select a larger device to program the file or a smaller file.
+
+Error #63:	(Reserved for Test mode)
+
+Error #64:	Error! The device in this socket is not a 28F010 or a 28F020. Cannot
+		use Standard Programming algorithm here.
+
+Explanation:	An attempt was made to use the Standard algorithms when a non-
+		Standard algorithm device was inserted.
+Solution:	Remove the device and insert a 28Fxxx device to initiate the Standard
+		Program (Flashrite) algorithm.
+
+Error #65:	Error! The device failed the Standard Programming algorithm.
+
+Explanation:	An error was encountered while in the Flashrite algorithm, or programming
+		a Flashrite part.
+Solution:	Retry the programming operation. If the error does not happen at the 
+		same address again, then it will continue. If the error happens again, the
+		device is bad (hard error).
+
+Error #66:	Error! The device in this socket is not a 28F010 or a 28F020. Cannot
+		use Standard Erase algorithm here.
+
+Explanation:	An attempt was made to use the Standard algorithms when a non-
+		Standard algorithm device was inserted.
+Solution:	Remove the device and insert a 28Fxxx device to initiate the Standard
+		Erase (Flasherase) algorithm.
+
+Error #67:	Error! The device failed the Standard Erase algorithm.
+
+Explanation:	An error was encountered while in the Flasherase algorithm, or erasing
+		a Flasherase part.
+Solution:	Retry the erase operation. If the error does not happen at the 
+		same address again, then it will continue. If the error happens again, the
+		device is bad (hard error).
+
+Error #68:	Error! The devices failed the Parallel Programming Algorithm.
+
+Explanation:	An error was encountered while in the Parallel Flashrite algorithm, or 
+		programming Flasherase parts.
+Solution:	Retry the programming operation. If the error does not happen at the 
+		same address again, then it will continue. If the error happens again, the
+		device is bad (hard error).
+
+Error #69:	Error! The devices failed the Parallel Erase Algorithm.
+
+Explanation:	An error was encountered while in the Parallel Flasherase algorithm, or 
+		erasing Flasherase parts.
+Solution:	Retry the erase operation. If the error does not happen at the 
+		same address again, then it will continue. If the error happens again, the
+		device is bad (hard error).
+
+Error #70:	This function is not applicable to xxxx devices.
+
+Explanation:	The function called cannot be used for the device listed in xxxx.
+
+Solution:	Try a valid function according to the type of device installed in the socket.
+
+Error #71:	Reserved
+
+Error #72:	Reserved
+
+Error #73:	Reserved
+
+Error #74:	Reserved
+
+Error #75:	Reserved
+
+Error #76:	Reserved
+
+Error #77:	Reserved
+
+Error #78:	Reserved
+
+Error #79:	Reserved
+
+Error #80:	Error! Erase suspend not available for xxxx.
+
+Explanation:	The Erase Suspend function is not supported by the device currently in 
+		the socket. The device inserted was specified in xxxx.
+Solution:	Remove the device and insert a supported part.
+
+Error #81:	Reserved
+
+
+
+Errata
+
+7/94:		First Revision of the manual
+9/94:		Second Revision of the manual
+		Adds minor clarifications, removal of Sector Protect and Unprotect routines 
+		(We request that a programmer apparatus (such as Data I/O (TM)) be used 
+		to protect and unprotect the devices. This will ensure that the devices or the 
+		user's design will not be damaged, which can happen due to the high 
+		voltages needed to be present on various pins of the flash device, and 
+		possible timing problems.)
+2/95:		Third Revision of the manual
+		Includes wording of 29F080 support, as well as minor updates to AMD flash 	
+		devices family
+10/95:		Fourth Revision of the manual
+		Minor changes to Bus Options table in the Introduction, added note about 
+		29F040, 29F400A
+
+
