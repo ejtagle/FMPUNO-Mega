@@ -68,6 +68,9 @@ class programmer_gui(wx.Frame):
         edititem3 = editmenu.Append(wx.NewIdRef(), '&Program', '')
         edititem4 = editmenu.Append(wx.NewIdRef(), 'Pr&otect', '')
         edititem5 = editmenu.Append(wx.NewIdRef(), '&Unprotect', '')
+        edititem6 = editmenu.Append(wx.NewIdRef(), 'I2C Write', '')
+        edititem7 = editmenu.Append(wx.NewIdRef(), 'I2C Read', '')
+
 
         menubar.Append(filemenu, 'File')
         menubar.Append(editmenu, 'Edit')
@@ -81,6 +84,8 @@ class programmer_gui(wx.Frame):
         self.Bind(wx.EVT_MENU, self.OnProgram, edititem3)
         self.Bind(wx.EVT_MENU, self.OnProtect, edititem4)
         self.Bind(wx.EVT_MENU, self.OnUnprotect, edititem5)
+        self.Bind(wx.EVT_MENU, self.OnI2CWrite, edititem6)
+        self.Bind(wx.EVT_MENU, self.OnI2CRead, edititem7)
 
         # End menubar
 
@@ -104,6 +109,8 @@ class programmer_gui(wx.Frame):
         self.buttonInfo = wx.Button(panel, id=-1, label='Infos', pos=(20 + 65, 280), size=(65, 40))
         self.buttonProtect = wx.Button(panel, id=-1, label='Protect', pos=(20+ 65 + 65, 240), size=(65, 40))
         self.buttonUnprotect = wx.Button(panel, id=-1, label='Unprotect',pos=(20+ 65 + 65, 280), size=(65, 40))
+        self.buttonI2CWrite = wx.Button(panel, id=-1, label='I2C Write', pos=(20, 320), size=(65, 40))
+        self.buttonI2CRead = wx.Button(panel, id=-1, label='I2C Read',  pos=(20 + 65, 320), size=(65, 40))
 
         self.textarea = wx.TextCtrl(panel, pos=(240, 10), style=wx.TE_MULTILINE | wx.TE_READONLY, size=(450, 265))
 
@@ -173,11 +180,14 @@ class programmer_gui(wx.Frame):
         self.Bind(wx.EVT_BUTTON, self.OnInfos, self.buttonInfo)
         self.Bind(wx.EVT_BUTTON, self.OnProtect, self.buttonProtect)
         self.Bind(wx.EVT_BUTTON, self.OnUnprotect, self.buttonUnprotect)
+        self.Bind(wx.EVT_BUTTON, self.OnI2CWrite, self.buttonI2CWrite)
+        self.Bind(wx.EVT_BUTTON, self.OnI2CRead, self.buttonI2CRead)
+
         self.Bind(wx.EVT_CLOSE, self.OnExit)
 
         self.intro = \
             '''ARDUINO AMD FLASH MEMORY PROGRAMMER - XXX29F0XX Series
-            @Version: 1.0
+            @Version: 1.1
             @Arduino ver: MEGA
             @Python 3.9.1+
             @Author: https://github.com/warber0x
@@ -262,6 +272,195 @@ class programmer_gui(wx.Frame):
                                ' AMD Flash Programmer', wx.OK)
         dlg.ShowModal()  # Show it
         dlg.Destroy()  # finally destroy it when finished.
+
+# # # # # # # # # # # # # # # # # # # # # # # # 
+
+    def OnI2CRead(self, event):
+
+        self.gauge.SetValue(0)
+        self.gauge_counter = 0
+        t1 = GaugeThread()
+
+        self.percent = 0
+        port = str(self.serialBox.GetValue())
+        baudrate = str(self.baudBox.GetValue())
+        print(port,baudrate)
+
+        # serial = 0
+
+        car = ''
+        self.textarea.SetValue(self.intro)
+
+        if str(self.serialBox.GetValue()) != '' and baudrate != '':
+            line = 1
+            temp_intro = self.textarea.GetValue()
+            count = 0
+            counter = 0
+            val = ''
+            total = 0x1FF / 100  # 0x1FF in arduino code
+            i = 0
+            linecount = 0
+
+            try:
+                arduino = serial.Serial(port, int(float(baudrate)),
+                        timeout=30)
+            except:
+                dlg = wx.MessageDialog(self,
+                        "Can't communicate with Arduino, please check serial ports !!!"
+                        , 'Communication Problem', wx.OK)
+                dlg.ShowModal()
+                dlg.Destroy()
+                return
+
+            time.sleep(2)
+
+            self.SetStatusText('Please wait ...')
+
+            car = car + str("%06x" % linecount) + '\t'
+
+            game = open(self.uploadText.GetValue(), 'wb')
+
+            command = 'r'
+            arduino.write(command.encode())
+
+            time.sleep(.001)                    # delay of 1ms
+            val = arduino.readline()                # read complete line from serial output
+            self.SetStatusText('Reading the I2C memory chip ...')
+            while not '\\n'in str(val):  
+                time.sleep(.001)                # delay of 1ms 
+                temp = arduino.readline()           # check for serial output.
+                if not not temp.decode():       # if temp is not empty.
+                    val = (val.decode()+temp.decode()).encode()
+                    # required to decode, sum, then encode because
+                    # long values might require multiple passes
+            val = val.decode()                  # decoding from bytes
+            val = val.strip()                   # stripping leading and trailing spaces.
+            
+            game.write(bytes.fromhex(val))
+            
+            for value in str(val):
+                car = car + value
+                count += 1
+                if count == 2:
+                    car = car + ' '
+                    count = 0
+
+                if line != 32:
+                    line += 1
+                else:
+                    car = car + '\n'
+                    line = 1
+                    linecount += 16
+                    car = car + str("%06x" % linecount) + '\t'
+                    car = car.upper()
+                
+                self.percent = round(i / total)
+                i += 1
+
+            car += '\n\n' + str(temp_intro)
+            car = car.upper()
+
+            self.textarea.SetValue(car)
+            self.SetStatusText('Operation Completed Successfully.')
+            dlg = wx.MessageDialog(self, 'Operation Completed', 'IC read', wx.OK)
+            arduino.close()
+        else:
+
+            dlg = wx.MessageDialog(self,
+                                   "Can't communicate with Arduino, please check the fileds"
+                                   , 'Incorrect values', wx.OK)
+            dlg.ShowModal()
+            dlg.Destroy()
+
+            # self.textarea.SetValue(car)
+        t1.raise_exception()
+        t1.join()
+
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+
+    def OnI2CWrite(self, event):
+
+                # #######################################################################
+                # The following functions are destined to program the memory chip
+                # Should be included in function to be organizedreflexion
+                # Mind the logic of the algorithm
+                # #######################################################################
+
+        gameSize = 0
+        game = ''
+
+                # Open Serial port and wait arduino to reset
+
+        port = str(self.serialBox.GetValue())
+        baudrate = str(self.baudBox.GetValue())
+        print(port,baudrate)
+
+        try:
+            arduino = serial.Serial(port, int(float(baudrate)),
+                                    timeout=30)
+        except:
+            dlg = wx.MessageDialog(self,
+                                   "Can't communicate with Arduino, please check serial ports", 'Communication Problem', wx.OK)
+            dlg.ShowModal()
+            dlg.Destroy()
+            return
+
+        self.SetStatusText('Please wait ...')
+        time.sleep(2)
+
+        # Get Game size and send it to Arduino
+
+        path = self.uploadText.GetValue()
+
+        if path != '':
+            self.SetStatusText('Getting file path ...')
+            gameSize = 256
+            game = open(self.uploadText.GetValue(), 'rb')
+
+            # Send begin command to Arduino and
+            # Wait OK from Arduino to begin programming
+            # Set Arduino in programming mode and wait for its response
+
+            command = 'w'
+            arduino.write(command.encode())
+
+            val = arduino.read()                # read complete line from serial output
+            if '+' in str(val):
+                self.SetStatusText('Writing I2C ... ')
+            else:
+                self.SetStatusText('Error Writing ...')
+                return
+
+            mainFrame.setButtonDisable()
+            car = ''
+
+            for x in range(0, gameSize):
+                car = game.read(1)
+                arduino.write(car)
+
+                # Wait for ack from Arduino
+                car = arduino.read()
+                print(car)
+                if '+' not in str(car):
+                    dlg = wx.MessageDialog(self, 'Arduino did not answer', 'Programming error', wx.OK)
+                    dlg.ShowModal()
+                    dlg.Destroy()
+                    break
+
+            self.SetStatusText('Upload completed.')
+
+            mainFrame.setButtonEnable()
+            arduino.close()
+            game.close()
+        
+            dlg = wx.MessageDialog(self, 'I2C Write completed', 'IC writing', wx.OK)
+            dlg.ShowModal()
+            dlg.Destroy()
+        else:
+            dlg = wx.MessageDialog(self, 'I2C file is missing', 'I2C File', wx.OK)
+            dlg.ShowModal()
+            dlg.Destroy()
 
 # # # # # # # # # # # # # # # # # # # # # # # # 
 
@@ -847,6 +1046,7 @@ class programmer_gui(wx.Frame):
         dlg.Destroy()
 
         return
+
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 

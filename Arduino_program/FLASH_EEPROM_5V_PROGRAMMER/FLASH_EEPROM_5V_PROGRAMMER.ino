@@ -7,6 +7,7 @@
 
 #include <avr/io.h>
 #include <util/delay.h>
+#include <Wire.h>
 
 // Minimum required stabilization time: 1uS
 #define ACCESS_DELAY 1
@@ -30,6 +31,10 @@
  D30        | PC7 => OE
  D24        | PA2 => OE_12V
  D22        | PA0 => A9_12V
+
+ I2C programmer
+ D21        | SCL
+ D20        | SDA
  */
 
 #define CE_PIN 34 /* PC3 */
@@ -1688,9 +1693,74 @@ void test_addresses()
     Serial.println("Test Done");
 }
 
+void eeprom_i2c_write(byte address, byte from_addr, byte data) {
+  Wire.beginTransmission(address);
+  Wire.write(from_addr);
+  Wire.write(data);
+  Wire.endTransmission();
+}
+
+byte eeprom_i2c_read(int address, int from_addr) {
+  Wire.beginTransmission(address);
+  Wire.write(from_addr);
+  Wire.endTransmission();
+
+  Wire.requestFrom(address, 1);
+  if(Wire.available())
+    return Wire.read();
+  else
+    return 0xFF;
+}
+#define ADDR_24C02 0b01010000
+
+void i2c_read_memory()
+{
+    // Determine maximum address to read
+    uint32_t max_addr = 256;
+
+    /* Read the chip until the address given */
+    for (uint32_t addr = 0UL; addr < max_addr; ++addr) {
+        uint8_t d = eeprom_i2c_read(ADDR_24C02, addr);
+        if (d < 0x10U)
+            Serial.print("0");
+        Serial.print(d, HEX);
+    }
+    Serial.flush();
+}
+
+void i2c_program_memory()
+{
+    // Ack the Write command
+    Serial.print("+");
+    Serial.flush();
+
+    uint32_t maxaddr = 256;
+    uint32_t address = 0;
+    while(address < maxaddr) {
+
+        // Wait for a character
+        while (!Serial.available());
+        uint8_t data = Serial.read();
+
+        // Try to program byte
+        eeprom_i2c_write(ADDR_24C02, address, data);
+        _delay_ms(2);
+        
+        // Ack received byte
+        Serial.print("+");
+        Serial.flush();
+
+        ++address;
+    }
+}
+
+
 void setup()
 {
   Serial.begin(115200);
+
+  Wire.begin(); // i2c setup
+  
   //ANALOG_CONFIG;
 
   //Set the chip controller
@@ -1792,6 +1862,17 @@ void loop()
         case 'T': // Test
         case 't': // Test
             test_addresses();
+            break;
+
+        /* I2C */
+        case 'r':
+            i2c_read_memory();
+            Serial.println("");
+            break;
+
+        case 'w':
+            i2c_program_memory();
+            Serial.println("");
             break;
 
         default:
