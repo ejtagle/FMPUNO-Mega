@@ -1744,7 +1744,7 @@ void i2c_program_memory()
 
         // Try to program byte
         eeprom_i2c_write(ADDR_24C02, address, data);
-        _delay_ms(2);
+        _delay_ms(15); // (to be on the safe side)
         
         // Ack received byte
         Serial.print("+");
