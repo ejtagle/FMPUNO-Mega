@@ -432,10 +432,10 @@ class programmer_gui(wx.Frame):
                 self.SetStatusText('Error Writing ...')
                 return
 
-            mainFrame.setButtonDisable()
+            self.setButtonDisable()
             car = ''
 
-            for x in range(0, gameSize):
+            for x in range(gameSize):
                 car = game.read(1)
                 arduino.write(car)
 
@@ -449,10 +449,10 @@ class programmer_gui(wx.Frame):
                     break
 
             self.SetStatusText('Upload completed.')
-
-            mainFrame.setButtonEnable()
             arduino.close()
             game.close()
+            self.setButtonEnable()
+           
         
             dlg = wx.MessageDialog(self, 'I2C Write completed', 'IC writing', wx.OK)
             dlg.ShowModal()
