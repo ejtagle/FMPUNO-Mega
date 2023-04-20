@@ -865,7 +865,10 @@ void flash_program_memory()
             uint16_t topgm = chunksz;
             do {
                 uint8_t data = *p;
-                if (!flash_program_byte(address, data)) {
+								
+								uint8_t wrtries = 5;
+								while (!flash_program_byte(address, data) && --wrtries != 0);
+                if (!wrtries) {
 
                     // Exit programming mode
                     flash_reset_chip();
@@ -898,7 +901,9 @@ void flash_program_memory()
             uint8_t data = Serial.read();
 
             // Try to program byte
-            if (!flash_program_byte(address, data)) {
+						uint8_t wrtries = 5;
+						while (!flash_program_byte(address, data) && --wrtries != 0);
+            if (!wrtries) {
                 Serial.print("-");
                 Serial.flush();
                 break;
