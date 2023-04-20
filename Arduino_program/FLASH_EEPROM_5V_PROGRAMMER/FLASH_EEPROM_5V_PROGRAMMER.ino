@@ -410,7 +410,7 @@ static bool flash_DQ7_byte_poll(uint32_t addr, uint8_t data)
 
     /* Data polling algorithm */
     uint8_t rd = 0;
-    uint16_t loops = 1000U; // at 20 mhz, 7us is 140 cycles
+    uint16_t loops = 2000U; // at 20 mhz, 14us is 280 cycles
     do {
         // Read status
         flash_control_ce(0);  //CE
