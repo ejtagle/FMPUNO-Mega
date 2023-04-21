@@ -10,7 +10,7 @@
 #include <Wire.h>
 
 // Minimum required stabilization time: 1uS
-#define ACCESS_DELAY 1
+#define ACCESS_DELAY 5 /* original 1us, trying 5uS */
 
 /*
  D54 - D61    | PF0-PF7 => DQ0-DQ7
