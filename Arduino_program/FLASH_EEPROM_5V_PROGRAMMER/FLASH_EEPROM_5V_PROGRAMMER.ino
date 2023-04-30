@@ -183,9 +183,10 @@ static force_inline void flash_control_a9_12v(bool enable)
 /* Need a fast change mode IN/OUT. If io = 1, configure them as inputs, otherwise as outputs */
 static force_inline void flash_change_databus_direction(bool io)
 {
-    if (io)
+    if (io) {
         DDR_DATA = 0; /* Configure all as inputs */
-    else
+        PORT_DATA = 0; /* Disable pull ups */
+    } else
         DDR_DATA = 0xFF; /* Configure all as outputs */
 }
 
