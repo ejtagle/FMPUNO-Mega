@@ -639,12 +639,12 @@ void flash_manufacturer_id()
 
 void flash_read_memory()
 {
-
+/*
     if (dev_id == -1)
         flash_device_id_10(false);
-
+*/
     // Determine maximum address to read
-    uint32_t max_addr = (dev_id == D29F010 || dev_id == D27M1001 || dev_id == D27M1001_V2)
+    uint32_t max_addr = (dev_id == -1 || dev_id == D29F010 || dev_id == D27M1001 || dev_id == D27M1001_V2)
         ? 0x20000UL
         : 0x80000UL;
 
